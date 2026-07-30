@@ -1,0 +1,76 @@
+{
+    "name": "langsys-js-solid",
+    "version": "0.1.0",
+    "description": "SolidJS binding for the Langsys translation SDK — realtime continuous translations with automatic token discovery, delivered as reactive primitives and a <Translate> component.",
+    "author": "Langsys",
+    "license": "MIT",
+    "homepage": "https://github.com/langsys/langsys-js-solid",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/langsys/langsys-js-solid.git"
+    },
+    "bugs": {
+        "url": "https://github.com/langsys/langsys-js-solid/issues"
+    },
+    "engines": {
+        "node": ">=18"
+    },
+    "main": "dist/index.js",
+    "module": "dist/index.mjs",
+    "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.mjs",
+            "require": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist",
+        "README.md",
+        "CHANGELOG.md",
+        "LICENSE"
+    ],
+    "sideEffects": false,
+    "scripts": {
+        "dev": "vite",
+        "build": "tsup",
+        "build:watch": "tsup --watch",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "lint": "prettier --check .",
+        "format": "prettier --write .",
+        "prepublishOnly": "npm run build"
+    },
+    "keywords": [
+        "i18n",
+        "l10n",
+        "solid",
+        "solidjs",
+        "solid-js",
+        "signals",
+        "language",
+        "localization",
+        "internationalization",
+        "translation",
+        "langsys",
+        "sdk"
+    ],
+    "peerDependencies": {
+        "solid-js": "^1.8.0"
+    },
+    "dependencies": {
+        "langsys-js-typescript": "^0.4.1"
+    },
+    "devDependencies": {
+        "happy-dom": "^15.0.0",
+        "prettier": "^3.3.0",
+        "solid-js": "^1.9.0",
+        "tsup": "^8.4.0",
+        "typescript": "^5.8.3",
+        "vite": "^6.0.0",
+        "vite-plugin-solid": "^2.11.0",
+        "vitest": "^3.2.0"
+    }
+}

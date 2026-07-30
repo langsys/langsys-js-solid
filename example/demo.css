@@ -1,0 +1,169 @@
+/* Shared look for all five demo apps — same app, different stack.
+   Changing this? Update demo.css in typescript/react/vue/svelte (src/) and
+   laravel (public/) alike. */
+
+:root {
+    --bg: #f6f7fb;
+    --card: #ffffff;
+    --ink: #1c2333;
+    --muted: #5b6478;
+    --accent: #4f46e5;
+    --border: #e3e6ef;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+}
+
+.demo-banner {
+    background: #fff7e6;
+    border-bottom: 1px solid #f0dcae;
+    padding: 10px 20px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.demo-banner a {
+    color: var(--accent);
+}
+
+.app {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 28px 20px 48px;
+}
+
+.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+}
+
+.brand {
+    font-weight: 700;
+    font-size: 18px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.brand .logo {
+    color: var(--accent);
+}
+
+.locales {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.pill {
+    border: 1px solid var(--border);
+    background: var(--card);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--ink);
+}
+
+.pill.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+.card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+}
+
+.card h2 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.card h2 code {
+    font-size: 12px;
+    background: var(--bg);
+    padding: 1px 6px;
+    border-radius: 6px;
+}
+
+.live {
+    font-size: 18px;
+    line-height: 1.5;
+    margin: 10px 0 0;
+}
+
+.live p {
+    margin: 0;
+}
+
+.live h3 {
+    margin: 0 0 4px;
+    font-size: 20px;
+}
+
+.hint {
+    margin: 10px 0 0;
+    font-size: 12.5px;
+    color: var(--muted);
+}
+
+.stepper {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+/* The Laravel demo's stepper is server-rendered links; same look either way. */
+.stepper button,
+.stepper a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    font-size: 16px;
+    cursor: pointer;
+    color: var(--ink);
+    text-decoration: none;
+}
+
+.stepper .count {
+    min-width: 24px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 15px;
+}
+
+footer.meta {
+    margin-top: 22px;
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+}
+
+footer.meta a {
+    color: var(--accent);
+}

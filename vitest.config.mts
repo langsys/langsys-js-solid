@@ -1,32 +1,28 @@
+import solid from 'vite-plugin-solid';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-    // Resolve solid-js's browser build — Node's default export condition maps
-    // to solid's server build, whose reactive graph is inert (computations run
-    // once and never track), which would make every reactivity test pass
-    // vacuously or fail. Standard setup for testing Solid code under vitest.
-    resolve: {
-        conditions: ['browser', 'development'],
-    },
-    // Vitest resolves inlined deps through vite's SSR pipeline, which has its
-    // own condition set — without these, solid still resolves to the server
-    // build even with the resolve.conditions above.
-    ssr: {
-        resolve: {
-            conditions: ['browser', 'development'],
-            externalConditions: ['browser', 'development'],
-        },
-    },
+    // `vite-plugin-solid` is what makes solid resolve to its browser build here.
+    // Node's default export condition maps to solid's SERVER build, whose
+    // reactive graph is inert — computations run once and never track — so
+    // reactivity tests fail (or, worse, pass vacuously). Setting
+    // `resolve.conditions` by hand is not enough: vitest resolves through
+    // vite's SSR pipeline, which the plugin configures for us alongside the
+    // JSX transform.
+    plugins: [solid()],
     test: {
-        environment: 'node',
+        // Solid's browser build expects DOM globals at import time.
+        environment: 'happy-dom',
         include: ['src/**/*.test.ts'],
         server: {
             deps: {
-                // Without inlining, node_modules are resolved by Node itself,
-                // which picks solid's server build regardless of the
-                // conditions above.
+                // Keep solid on vite's pipeline; left to Node's own resolver it
+                // reverts to the server build regardless of the plugin.
                 inline: [/solid-js/],
             },
         },
+    },
+    resolve: {
+        conditions: ['browser', 'development'],
     },
 });

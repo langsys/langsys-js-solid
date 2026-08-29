@@ -37,8 +37,9 @@
         "build": "tsup",
         "build:watch": "tsup --watch",
         "typecheck": "tsc --noEmit",
-        "test": "vitest run",
+        "test": "vitest run && vitest run --config vitest.ssr.config.mts",
         "test:watch": "vitest",
+        "test:ssr": "vitest run --config vitest.ssr.config.mts",
         "lint": "prettier --check .",
         "format": "prettier --write .",
         "prepublishOnly": "npm run build"

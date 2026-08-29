@@ -33,6 +33,19 @@ await LangsysApp.init({
 Switch locale anywhere with `locale.set('fr-FR')` — every `useT()` consumer
 re-renders with the new catalog once it loads.
 
+Input casing is forgiving, but **`useCurrentLocale()` emits the SDK's canonical
+form, which is lowercase in both halves** (`'fr-FR'` in → `'fr-fr'` out). Compare
+against it through `canonicalizeLocale`, never against a raw string:
+
+```ts
+import { canonicalizeLocale, useCurrentLocale } from 'langsys-js-solid';
+
+const current = useCurrentLocale();
+if (current() === canonicalizeLocale('fr-FR')) {
+    /* … */
+} // not `=== 'fr-FR'`
+```
+
 ## Translate
 
 ```tsx

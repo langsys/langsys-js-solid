@@ -38,10 +38,15 @@ export function useSignal<T>(signal: Signal<T>): Accessor<T> {
  * and switch locale with `store.set('fr-FR')`. The base SDK only ever reads and
  * subscribes to it — it never writes.
  *
- * Locale identifiers are canonicalized to BCP 47 by the base SDK (v0.3.0+), so
- * `'en-us'` still works on input — but `currentlyLoadedLocale` always emits the
- * canonical form (`'en-US'`), so prefer canonical casing to keep comparisons
- * against it straightforward.
+ * The store holds whatever you put in it, verbatim — it is a container, not a
+ * normalizer. The base SDK canonicalizes on its own side, and its canonical
+ * form is **lowercase in both halves**: `canonicalizeLocale('en-US')` is
+ * `'en-us'`, and `currentlyLoadedLocale` emits that form.
+ *
+ * So do not compare a raw store value against `currentlyLoadedLocale` — the two
+ * are in different cases and `'en-US' === 'en-us'` is never true. Run your value
+ * through the re-exported `canonicalizeLocale` first. (WIRE-3 requires lowercase
+ * on the wire; this is the same rule seen from the client side.)
  */
 export function createLocaleStore(initial = 'en-US'): Signal<string> {
     return createSignal<string>(initial);

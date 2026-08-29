@@ -13,7 +13,9 @@ export default defineConfig({
     test: {
         // Solid's browser build expects DOM globals at import time.
         environment: 'happy-dom',
-        include: ['src/**/*.test.ts'],
+        include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+        // The SSR project owns these; run against the browser build they are vacuous.
+        exclude: ['src/**/*.ssr.test.tsx'],
         server: {
             deps: {
                 // Keep solid on vite's pipeline; left to Node's own resolver it

@@ -81,3 +81,30 @@ describe('BIND-6 — the binding forwards the core surface by reference', () => 
         expect(LangsysApp.debug).toBe(coreLangsysApp.debug);
     });
 });
+
+describe('BIND-1 — `writeEnabled` is deliberately NOT re-exported raw', () => {
+    /**
+     * Reading the core signal raw resolves synchronously, which is exactly the
+     * hydration hazard `useWriteEnabled()` exists to avoid: a session that
+     * authorizes before hydration would seed a concrete value into markup the
+     * server rendered as unknown.
+     *
+     * The reasoning lives at the export site in `index.ts`, but a comment does
+     * not fail a build. This does — a future maintainer adding `writeEnabled`
+     * to that raw-signal export line lands red rather than green.
+     */
+    it('does not export the raw core signal', async () => {
+        const publicSurface = (await import('./index.js')) as Record<string, unknown>;
+        expect(publicSurface.writeEnabled).toBeUndefined();
+    });
+
+    it('has a positive control: the core does export it, and the supported surface exists', async () => {
+        // Without this, the assertion above would pass just as well if the core
+        // had no `writeEnabled` at all, or if the import had silently failed.
+        const core = (await import('langsys-js-typescript')) as Record<string, unknown>;
+        expect(core.writeEnabled).toBeDefined();
+
+        const publicSurface = (await import('./index.js')) as Record<string, unknown>;
+        expect(typeof publicSurface.useWriteEnabled).toBe('function');
+    });
+});

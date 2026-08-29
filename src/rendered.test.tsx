@@ -32,7 +32,7 @@ import { useT, useWriteEnabled } from './primitives.js';
  * So every assertion here goes through `render()` and reads
  * `container.textContent` — the DOM, not the signal.
  *
- * The SSR half lives in `ssr.test.tsx`: this file runs against Solid's BROWSER
+ * The SSR half lives in `capability.ssr.test.tsx`: this file runs against Solid's BROWSER
  * build (forced by `vitest.config.mts`, without which the reactive graph is
  * inert and these tests would pass vacuously), and `renderToString` is a
  * non-functional stub there.
@@ -140,19 +140,36 @@ describe('useT — through a rendered template', () => {
         expect(view.text).toBe('Hola'); // REPAINTED
     });
 
-    it('repaints on locale change alone', () => {
-        sTranslations.set(catalog('Greeting', { Hello: 'Bonjour' }));
+    it('repaints when a locale switch lands its catalog — the real product path', () => {
+        /**
+         * Replaces a test named "repaints on locale change alone", which was a
+         * tautology: `t()` resolves against `sTranslations`, not against the
+         * locale, so a locale change on its own re-mints the `TFunction`
+         * identity while rendering byte-identical text. Both of its assertions
+         * held whether or not propagation worked — it stayed green under a
+         * kill-propagation mutation that reddened the catalog test beside it.
+         *
+         * This asserts the sequence that actually happens, and pins the
+         * semantics that made the old test vacuous as a fact in its own right.
+         */
+        sTranslations.set(catalog('Greeting', { Hello: 'Hello there' }));
         currentlyLoadedLocale.set('en-us');
 
         const view = mount(() => {
             const t = useT();
             return <span>{t()('Hello', 'Greeting')}</span>;
         });
-        const first = view.text;
+        expect(view.text).toBe('Hello there');
 
+        // 1. The locale flips first. The new catalog is still in flight, and
+        //    `t()` reads the catalog — so the text MUST NOT change yet.
         currentlyLoadedLocale.set('fr-fr');
+        expect(view.text).toBe('Hello there');
+
+        // 2. The fetch lands and replaces the catalog. THIS is the repaint, and
+        //    this assertion dies under a kill-propagation mutation.
+        sTranslations.set(catalog('Greeting', { Hello: 'Bonjour' }));
         expect(view.text).toBe('Bonjour');
-        expect(view.text).not.toBe(first === 'Bonjour' ? '' : first);
     });
 });
 

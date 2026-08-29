@@ -54,6 +54,15 @@ import {
 // Reactive primitives (raw signals) — re-exported for advanced/direct
 // subscription. `tSignal` is exposed under the friendlier name `t`. In
 // components, prefer the primitives (`useT`, `useCurrentLocale`, …).
+//
+// `writeEnabled` is the one core signal deliberately NOT re-exported here, and
+// it must stay that way. Reading it raw resolves synchronously, so a session
+// that authorizes before hydration would seed a concrete value into markup the
+// server rendered as unknown, and the first client render would disagree with
+// the server's HTML. `useWriteEnabled()` in `primitives.js` is the supported
+// surface: same value, adopted after mount. Adding it to the line below would
+// reintroduce the hazard silently — `surface.test.ts` asserts its absence so
+// that lands red instead of green.
 export { currentlyLoadedLocale, createSignal, sTranslations, tSignal as t } from 'langsys-js-typescript';
 
 // Locale canonicalization (BCP 47) — the SDK canonicalizes all locale input

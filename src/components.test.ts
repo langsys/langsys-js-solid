@@ -44,7 +44,10 @@ describe('Translate', () => {
         createRoot((dispose) => {
             const child = document.createElement('h3');
             child.textContent = 'Welcome';
-            const host = Translate({ category: 'Home', children: child as unknown as ReturnType<typeof Translate> }) as HTMLElement;
+            const host = Translate({
+                category: 'Home',
+                children: child as unknown as ReturnType<typeof Translate>,
+            }) as HTMLElement;
             expect(host.tagName.toLowerCase()).toBe('translate');
             expect(host.querySelector('h3')?.textContent).toBe('Welcome');
             dispose();

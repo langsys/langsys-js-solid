@@ -7,14 +7,15 @@
  * component glue.
  *
  * Public API:
- *   - `LangsysApp` — `init` accepts a `Signal<string>` (make one with
- *     `createLocaleStore`, or adapt an existing Solid signal pair with
- *     `solidToLocaleSource`) for the user locale; every other method delegates.
+ *   - `LangsysApp` — the base SDK's singleton forwarded **by reference**, with
+ *     two narrow overrides: `init` (accepts a `Signal<string>` for the user
+ *     locale and a Solid accessor for `writeGrant`) and `setWriteGrant`.
  *   - Primitives — `useT`, `useCurrentLocale`, `useTranslations`,
- *     `useLocaleStore`, and the low-level `useSignal`. These are the reactive
- *     layer; in components prefer them over the raw signals.
+ *     `useWriteEnabled`, `useLocaleStore`, and the low-level `useSignal`. These
+ *     are the reactive layer; in components prefer them over the raw signals.
  *   - `createLocaleStore` — make the user-locale store (Solid analog of
- *     Svelte's `writable`); `solidToLocaleSource` — adapt an existing signal.
+ *     Svelte's `writable`); `solidToLocaleSource` — adapt an existing signal;
+ *     `adaptWriteGrant` — resolve a Solid accessor as a write grant per call.
  *   - `Translate` / `Phrase` / `DontTranslate` — components wrapping the
  *     vanilla DOM handlers. Client-only (they build real DOM nodes).
  *   - Raw signals `t` / `currentlyLoadedLocale` / `sTranslations` — re-exported
@@ -22,6 +23,7 @@
  *     work with Solid's own `from()`).
  */
 
+import { adaptWriteGrant, type WriteGrantSource } from './adapters.js';
 import {
     LangsysApp as _LangsysApp,
     type ExtractParamKeys,
@@ -31,6 +33,7 @@ import {
     type TArgs,
     type TFunction,
     type TranslationParams,
+    type WriteGrant,
     type iCategories,
     type iContentBlock,
     type iCountry,
@@ -62,8 +65,9 @@ export { canonicalizeLocale } from 'langsys-js-typescript';
 export { LangsysAppAPI } from 'langsys-js-typescript';
 
 // Primitives + adapters (the Solid-idiomatic reactive layer)
-export { createLocaleStore, solidToLocaleSource, useSignal } from './adapters.js';
-export { useCurrentLocale, useLocaleStore, useT, useTranslations } from './primitives.js';
+export { adaptWriteGrant, createLocaleStore, solidToLocaleSource, useSignal } from './adapters.js';
+export type { WriteGrantSource } from './adapters.js';
+export { useCurrentLocale, useLocaleStore, useT, useTranslations, useWriteEnabled } from './primitives.js';
 
 // Components
 export { Translate, type TranslateProps } from './components/Translate.js';
@@ -80,6 +84,7 @@ export type {
     TArgs,
     TFunction,
     TranslationParams,
+    WriteGrant,
     iCategories,
     iContentBlock,
     iCountry,
@@ -97,93 +102,108 @@ export type {
 };
 
 /**
- * Solid-flavored init config. Identical to the base SDK's config except
- * `UserLocaleStore` is typed as a `Signal<string>` — create one with
- * `createLocaleStore()` (or get one from the `useLocaleStore` primitive, or
- * adapt an existing Solid signal with `solidToLocaleSource`). The base SDK
- * only reads and subscribes to it.
+ * Solid-flavored init config. Identical to the base SDK's config except for two
+ * fields the Solid idiom widens:
+ *
+ *   - `UserLocaleStore` is a `Signal<string>` — create one with
+ *     `createLocaleStore()`, take one from `useLocaleStore`, or adapt an
+ *     existing Solid signal with `solidToLocaleSource`. The base SDK only ever
+ *     reads and subscribes to it.
+ *   - `writeGrant` additionally accepts a Solid accessor, resolved per call.
  */
-export interface iLangsysInitConfig extends Omit<iVanillaInitConfig, 'UserLocaleStore'> {
+export interface iLangsysInitConfig extends Omit<iVanillaInitConfig, 'UserLocaleStore' | 'writeGrant'> {
     UserLocaleStore: Signal<string>;
+    /**
+     * Short-lived write grant for login-walled apps. Accepts everything the
+     * base SDK does (a string, or a sync/async callback), plus a Solid accessor
+     * — refresh the grant by setting the signal.
+     *
+     * Prefer the accessor or callback form. A bare string is quickstart-only:
+     * grants live ~5 minutes and an app inits once, so a static string is
+     * expired minutes in and every later write silently degrades to read-only.
+     */
+    writeGrant?: WriteGrantSource;
 }
 
 /**
- * Solid SDK entry point. Delegates everything to the underlying
- * `langsys-js-typescript` singleton. Because the Solid locale store is already
- * a `Signal` (unlike Svelte's `Writable`, which needs adapting), `init` is a
- * straight passthrough — the Solid-native concerns live in the primitives and
- * the components, not here.
+ * The Solid entry point's type: the base SDK's singleton exactly, with two
+ * methods re-typed for the Solid-flavored config.
  */
-class LangsysAppSolid {
+export type LangsysAppSolid = Omit<typeof _LangsysApp, 'init' | 'setWriteGrant'> & {
     /** Initialize Langsys. Pass a `Signal<string>` (from `createLocaleStore`) as `UserLocaleStore`. */
-    public init(config: iLangsysInitConfig): Promise<iLangsysResponse> {
-        return _LangsysApp.init(config);
-    }
+    init(config: iLangsysInitConfig): Promise<iLangsysResponse>;
+    /**
+     * Supply the write grant after `init()` — for apps whose token only exists
+     * once the user has logged in. Re-authorizes so the server re-evaluates the
+     * session with the new grant (GRANT-3), so `await` it if you need
+     * `useWriteEnabled()` settled before the next assertion.
+     */
+    setWriteGrant(grant: WriteGrantSource | undefined): Promise<void>;
+};
 
-    public get Translations() {
-        return _LangsysApp.Translations;
-    }
+/**
+ * The two methods this binding adapts, and nothing else. Both exist for a
+ * stated reason: `init` widens two config fields to Solid shapes, and
+ * `setWriteGrant` accepts a Solid accessor. Neither changes meaning — the
+ * decisions stay the core's (BIND-1, BIND-2).
+ */
+const overrides = {
+    init(config: iLangsysInitConfig): Promise<iLangsysResponse> {
+        return _LangsysApp.init({
+            ...config,
+            writeGrant: adaptWriteGrant(config.writeGrant),
+        });
+    },
+    setWriteGrant(grant: WriteGrantSource | undefined): Promise<void> {
+        return _LangsysApp.setWriteGrant(adaptWriteGrant(grant));
+    },
+} as const;
 
-    public get translationsLoadingPromise() {
-        return _LangsysApp.translationsLoadingPromise;
-    }
-
-    /** Current translation function. Reads fresh state on every call (not reactive on its own — use `useT()` in components). */
-    public get t(): TFunction {
-        return _LangsysApp.t;
-    }
-
-    public get debug() {
-        return _LangsysApp.debug;
-    }
-
-    public refresh() {
-        return _LangsysApp.refresh();
-    }
-
-    public getCountries(inLocale?: string) {
-        return _LangsysApp.getCountries(inLocale);
-    }
-    public getCountryName(forCountryCode: string, inLocale?: string) {
-        return _LangsysApp.getCountryName(forCountryCode, inLocale);
-    }
-    public getCurrencies(inLocale?: string) {
-        return _LangsysApp.getCurrencies(inLocale);
-    }
-    public getCurrencyName(forCurrencyCode: string, inLocale?: string) {
-        return _LangsysApp.getCurrencyName(forCurrencyCode, inLocale);
-    }
-    public getDialCodes(inLocale?: string) {
-        return _LangsysApp.getDialCodes(inLocale);
-    }
-
-    public getLocales(inLocale?: string) {
-        return _LangsysApp.getLocales(inLocale);
-    }
-    public getLocalesFlat(inLocale?: string) {
-        return _LangsysApp.getLocalesFlat(inLocale);
-    }
-    public getLocalesData(inLocale?: string, forceRefresh?: boolean) {
-        return _LangsysApp.getLocalesData(inLocale, forceRefresh);
-    }
-    public getLocalesFormat(format: '' | 'flat' | 'data' = '', inLocale?: string) {
-        return _LangsysApp.getLocalesFormat(format, inLocale);
-    }
-    public getLocaleName(forLocale: string, shortName?: boolean, inLocale?: string) {
-        return _LangsysApp.getLocaleName(forLocale, shortName, inLocale);
-    }
-    public getLocaleNameWithLookup(forLocale: string, shortName?: boolean, inLocale?: string) {
-        return _LangsysApp.getLocaleNameWithLookup(forLocale, shortName, inLocale);
-    }
-
-    /** @deprecated use `getLocaleNameWithLookup` or `getLocaleName` */
-    public getLanguageName(forLocale: string, shortName?: boolean, inLocale?: string) {
-        return _LangsysApp.getLanguageName(forLocale, shortName, inLocale);
-    }
-
-    public detectPreferredLocale(acceptLanguageHeader?: string | null, supportedLocales?: string[]) {
-        return _LangsysApp.detectPreferredLocale(acceptLanguageHeader, supportedLocales);
-    }
-}
-
-export const LangsysApp = new LangsysAppSolid();
+/**
+ * Solid SDK entry point — the base SDK's singleton, forwarded **by reference**,
+ * with the two narrow overrides above.
+ *
+ * ## Why a proxy and not a wrapper class
+ * This was a hand-written class enumerating one delegating method per core
+ * method. That shape has a failure mode with no symptom: **every method the
+ * core adds after the class is written silently disappears from this binding**,
+ * with a green typecheck and a green suite, because nothing references what is
+ * missing.
+ *
+ * It had already happened six times when the 838 audit found it. `setWriteGrant`
+ * — the entire write-grant surface — was simply not on the list, and neither
+ * were `applyAuthorization`, `getUserLanguagePreferences`,
+ * `parseAcceptLanguageHeader`, `findBestLocaleMatch` and `resolveLocale`.
+ * Adding `setWriteGrant` to the list would have fixed the symptom and left the
+ * mechanism running for the next core release to trip over.
+ *
+ * Forwarding by reference is what BIND-6 actually asks for — "re-export by
+ * reference everything that does not need adapting" — and it makes the binding
+ * excludable from an investigation in one sentence: everything but `init` and
+ * `setWriteGrant` *is* the core, not a copy of it. `src/surface.test.ts` guards
+ * the structure rather than any method name, so a future core addition cannot
+ * go missing quietly again.
+ *
+ * Forwarded members are returned **unbound**, so `LangsysApp.foo` and the
+ * core's `foo` are the same function object. Calling through the proxy sets
+ * `this` to the proxy, whose every read forwards to the core singleton, so the
+ * method sees the core's state either way. Binding instead would make a
+ * destructured method keep working here while the identical destructure off
+ * the core singleton breaks — a behaviour difference, which is precisely what
+ * BIND-1 forbids a binding from introducing. Own properties (`Translations`,
+ * `debug`, `config`, …) pass straight through.
+ *
+ * Safe because the core class uses no `#private` fields; those cannot be read
+ * through a proxy receiver and would force binding (and with it that
+ * divergence). `src/surface.test.ts` asserts the identity, so this stops being
+ * true loudly rather than silently.
+ */
+export const LangsysApp: LangsysAppSolid = new Proxy(_LangsysApp, {
+    get(target, prop) {
+        if (Object.prototype.hasOwnProperty.call(overrides, prop)) {
+            return overrides[prop as keyof typeof overrides];
+        }
+        // `target` as the receiver, so getters read the core's own state.
+        return Reflect.get(target, prop, target);
+    },
+}) as unknown as LangsysAppSolid;

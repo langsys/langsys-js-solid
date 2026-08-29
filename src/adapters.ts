@@ -1,6 +1,6 @@
-import { createComputed, createRoot, createSignal as createSolidSignal, getOwner, onCleanup } from 'solid-js';
+import { createComputed, createRoot, createSignal as createSolidSignal, getOwner, onCleanup, untrack } from 'solid-js';
 import type { Accessor } from 'solid-js';
-import { createSignal, type Signal } from 'langsys-js-typescript';
+import { createSignal, type Signal, type WriteGrant } from 'langsys-js-typescript';
 
 /**
  * Subscribe the current reactive scope to a base-SDK `Signal<T>` and return a
@@ -65,6 +65,42 @@ export function createLocaleStore(initial = 'en-US'): Signal<string> {
  * app's own `setLocale` included, not just writes through this adapter. The
  * returned unsubscriber disposes the root.
  */
+/**
+ * A write grant, in any form this binding accepts: everything the base SDK
+ * takes (a bare string, or a sync/async callback), plus a Solid accessor.
+ *
+ * The accessor arm is structurally identical to the SDK's callback arm — a
+ * Solid `Accessor<T>` *is* `() => T` — so it is not a new capability, only a
+ * statement that handing the SDK a Solid signal is a supported, first-class
+ * way to supply a grant.
+ */
+export type WriteGrantSource = WriteGrant | Accessor<string | null | undefined>;
+
+/**
+ * Adapt a Solid-flavored write grant into the base SDK's `WriteGrant`.
+ *
+ * **The whole job is resolving per call.** BIND-1 names this adapter as its
+ * worked example of "shape-adaptation that quietly narrows a guarantee":
+ * snapshotting the source at init looks like a pure adapter, type-checks
+ * identically, passes any test that asserts on shape — and produces a grant
+ * that can never refresh. Since grants live ~5 minutes and an app inits once
+ * and runs for hours (GRANT-1), a snapshotted grant is expired minutes in and
+ * every later write silently degrades to read-only (GRANT-2).
+ *
+ * A string is passed through untouched — the SDK re-reads it per request
+ * anyway, and it is documented as quickstart-only for exactly this reason.
+ *
+ * The function arm is wrapped rather than forwarded so the read is
+ * `untrack`ed. The SDK calls the provider from its own non-Solid code, but if
+ * such a call ever lands inside a Solid computation, a raw accessor read would
+ * subscribe that computation to the token and re-run it on every refresh. The
+ * grant is a value the SDK pulls, never a dependency it should own.
+ */
+export function adaptWriteGrant(grant: WriteGrantSource | undefined): WriteGrant | undefined {
+    if (grant === undefined || typeof grant === 'string') return grant;
+    return () => untrack(grant);
+}
+
 export function solidToLocaleSource(get: Accessor<string>, set: (value: string) => void): Signal<string> {
     return {
         get: () => get(),

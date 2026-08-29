@@ -1,0 +1,272 @@
+# CONFORMANCE — langsys-js-solid
+
+Conformance of this **binding** against the SDK Behaviour Spec.
+
+|                             |                                                                                                                                                 |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Spec version                | **7** (`specVersion: 7`)                                                                                                                        |
+| Spec text read              | `docs/sdk-spec.mdx` blob `06ae105a0a1f7b5245ec32929f0b3885c63f0336`, from `langsys2` `origin/main` @ `fabe22b2a54a06a6c7957b0ad06c52cc1274a4b5` |
+| Read at                     | 2026-08-29T18:38:48Z                                                                                                                            |
+| Repo state                  | `feature/838_write_key_gating`, branched from `main` @ `d330333`                                                                                |
+| Suite                       | **55 tests / 6 files**, all passing                                                                                                             |
+| Evidence grade of the suite | **`mock`** — happy-dom, no network                                                                                                              |
+| Core consumed               | `langsys-js-typescript` local `0.6.5` via `npm link` — **not** the published `0.6.5` (see [The two 0.6.5s](#the-two-065s))                      |
+| Profiles                    | `browser` · `binding` · `all`                                                                                                                   |
+
+> **Nothing in this file is graded `implemented`, and that is correct.** CONF-2:
+> the shared contract fixture does not exist, so `mock` evidence caps every
+> behavioural row at `provisional` across all thirteen repos. A binding with no
+> green ticks is the evidence model working, not a broken binding.
+
+## Scope — why this file is short
+
+This is a **binding**. It inherits the browser core's profile and adds nothing of its own, so
+most of the spec is not its to satisfy: the core owns registration, discovery, interpolation and
+identity outright. Grading those rules here would produce rows that cannot fail — the
+green-proving-nothing failure CONF-1/CONF-3 exist to stop.
+
+So this file carries exactly three things:
+
+1. **BIND-1..6** — the binding backbone. Every row, no exceptions.
+2. **Rules this binding could _interfere_ with** — where Solid code sits between the app and a
+   core decision. Interference is the only way a binding fails a behavioural rule.
+3. **One delegation block** for the families the core owns, each with a probe that could have
+   found participation and did not.
+
+A rule absent from this file is absent because this binding cannot reach it. Where that judgement
+is non-obvious, the row says so rather than omitting it.
+
+**This binding is unpublished** (`npm view langsys-js-solid` → E404). It has no shipped artifact
+and no back-compat obligation, which is why the BIND-6 fix below was taken as a structural
+replacement rather than an additive patch — the public-surface change is free now and permanent
+after first publish.
+
+## Grades
+
+| Grade         | Means                                                                                                                                                                                |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `implemented` | Behaviour present, evidence `live` or `contract`. **Unreachable today** — CONF-2.                                                                                                    |
+| `provisional` | Behaviour present, evidence `mock`. The honest ceiling until the fixture lands.                                                                                                      |
+| `partial`     | Present but incomplete or with a known gap, described in the row.                                                                                                                    |
+| `delegated`   | The core owns it and **this binding demonstrably does not participate** — an absence probe plus a positive control proving the probe could have found something. Never a bare "n/a". |
+| `n-a`         | Structurally unreachable, with the reason stated and the condition that would make it live.                                                                                          |
+| `open`        | A conformance question that is not mine to answer alone. Named, routed, unresolved. **Never green.**                                                                                 |
+
+## 1 — Binding rules (BIND-1..6)
+
+| Rule                                                              | Grade         | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **BIND-1** — adapt shape/timing, never meaning                    | `provisional` | Adaptation is confined to Solid's execution model: SDK `Signal` → Solid `Accessor` (`useSignal`), `createRoot`/`createComputed` for the locale adapter, mount/destroy component glue, and the hydration timing in `useWriteEnabled` (below). The one adapter BIND-1 names as its worked trap — grant provider resolution — is implemented per call and **mutation-tested**: snapshotting at adapt time turns 3 tests red (`write-grant.test.ts`).                                                                                    |
+| **BIND-2** — never branch on server-computed capability           | `provisional` | `useWriteEnabled()` surfaces the core's `writeEnabled` **unchanged** and branches on nothing. Probe for `write_enabled`/`key_type`/`keyType` in `src/`: **0**, control **7** and **12** in the core. This binding exposes **no `keyType` at all** — the capability signal it offers is the one GATE-1 mandates, not the one GATE-1 forbids deciding from.                                                                                                                                                                            |
+| **BIND-3** — owns no network behaviour                            | `delegated`   | Code-only probe (§3 method) for `fetch\|XMLHttpRequest\|setTimeout\|setInterval\|retry\|backoff\|headers`: **0 in this binding, 17 in the core.** No scheduling, no request construction, no header setting. The binding never touches a URL at all.                                                                                                                                                                                                                                                                                 |
+| **BIND-4** — introduces no configuration the core does not define | `provisional` | `iLangsysInitConfig` adds **no new keys**. It re-types two the core already defines: `UserLocaleStore` (`Signal<string>`, which the core's own type already is) and `writeGrant` (widened to accept a Solid accessor — an arm structurally identical to the core's existing callback arm). No `discovery`, `hint`, `suppress`, interval or threshold option exists; probe **0**.                                                                                                                                                     |
+| **BIND-5** — does not cache lookup results                        | **`open`**    | No memo primitive exists (`createMemo\|useMemo\|cache(` → **0**). But `useT()` sits behind **two equality gates in series**: the core's `Object.is` guard (`signal.ts:43`) and Solid's `createSignal` default `===` inside `useSignal` (`adapters.ts:26`). Both are inert **only** because `buildTFn()` mints a fresh function identity per emit (`translations.ts:97-99`). Measured: fresh identity → 3 renders; stable identity → **1 render, both later emits swallowed**. Routed to the Typescript lane. Not graded until ruled. |
+| **BIND-6** — wrap the narrowest surface possible                  | `provisional` | **Was the worst row in this file; now the best-guarded.** `LangsysApp` is the core singleton forwarded through a `Proxy` **by reference** — `LangsysApp.foo === core.foo` is asserted by identity for every core method — with exactly two overrides (`init`, `setWriteGrant`), each for a stated reason. `surface.test.ts` (27 tests) guards the **structure**, not a method list, so the next core addition cannot go missing quietly. See [the silent-drop mechanism](#the-silent-drop-mechanism).                                |
+
+## 2 — Rules this binding could interfere with
+
+Solid code sits between the app and the core on three paths: the **primitives** (every reactive
+read), the **components** (DOM tokenizing), and now the **grant adapter**. Everything below is
+graded on those.
+
+| Rule                                                                       | Grade           | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **GATE-1** — decide from `write_enabled`, never `key_type`                 | `delegated`     | The binding makes no register-or-report decision. Probe for `write_enabled` in `src/`: **0**; positive control **7** in the core. `useWriteEnabled()` reads the core's signal and forwards it; it never computes a decision.                                                                                                                                                                                                                                                                             |
+| **GATE-2** — collect always; choose the lane at the send site              | **`open`**      | The binding never collects or sends. But the equality gates in front of `t()` (BIND-5) can suppress the call that _feeds_ collection. Cannot be graded green until BIND-5 is ruled.                                                                                                                                                                                                                                                                                                                      |
+| **GATE-3** — never persist the write decision                              | `delegated`     | Probe for `localStorage\|sessionStorage\|persist`: **0 in this binding, 6 in the core.** `useWriteEnabled` holds its value in a Solid signal owned by the calling component and disposed with it — asserted in `capability.test.ts` ("stops observing the core once the owning root is disposed"). Nothing outlives the page session.                                                                                                                                                                    |
+| **GATE-4** — strip the decision from whatever you cache                    | `n-a`           | The binding caches no response envelope and no catalog. There is nothing here for a write decision to be embedded in.                                                                                                                                                                                                                                                                                                                                                                                    |
+| **GATE-7** — every detecting path feeds exactly one lane                   | **`open`**      | Same mechanism as BIND-5: if the lane-feed depends on re-entering `t()` per render, the equality gates sit in front of it. Routed to Typescript.                                                                                                                                                                                                                                                                                                                                                         |
+| **GATE-8** — missing `write_enabled` is a version signal, never permission | `provisional`   | The binding's obligation is not to collapse the tri-state, and it does not: `useWriteEnabled()` returns `Accessor<boolean \| undefined>` and **`undefined` is never defaulted to `false`** — asserted explicitly, and `false` is asserted to remain distinguishable from `undefined` once resolved (`capability.test.ts`). The version-signal inference itself is the core's and is not reached here.                                                                                                    |
+| **CAT-1** — a miss is decided by key presence, not truthiness              | **`open`**      | The binding reads no catalog directly; `useTranslations()` forwards `sTranslations` by reference. The sharp edge is the same equality gate: Solid's `===` on the catalog object. The core emits a fresh top-level object (`content-block.ts:358`, `return { ...current }`), so presence survives today — but by the same undocumented identity contract as BIND-5. Folded into that question.                                                                                                            |
+| **GRANT-1** — provider callback, documented as the default form            | `provisional`   | `writeGrant` accepts a string, a sync/async callback, **or a Solid accessor**. The README documents the signal/callback form as the default and states why the string form is quickstart-only (grants live ~5 min; an app inits once).                                                                                                                                                                                                                                                                   |
+| **GRANT-2** — resolve the grant per request; never cache the token         | `provisional`   | `adaptWriteGrant` returns `() => untrack(grant)` — resolved on **every** call, never at adapt time. This is BIND-1's named costume trap and is the one row here proven by mutation: replacing it with a snapshot turns 3 tests red, including one that refreshes the token four times through a login/logout cycle.                                                                                                                                                                                      |
+| **GRANT-3** — `setWriteGrant()` must re-authorize, not merely set config   | `delegated`     | `LangsysApp.setWriteGrant` adapts the grant shape and delegates to the core's method, which owns the re-authorization. The binding adds no configuration-only path. Probe: the binding contains no authorization logic (`applyAuthorization` is forwarded by reference, not re-implemented — asserted in `surface.test.ts`).                                                                                                                                                                             |
+| **GRANT-4** — send the grant as `X-Write-Grant`                            | `delegated`     | Header construction is the core's; BIND-3 probe confirms the binding sets no headers (**0** vs **17**).                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **OBS-1** — surface an unusable capability at least once                   | `partial` (gap) | The binding emits no diagnostic when authorization resolves `write_enabled: false` on a key expected to write. `useWriteEnabled()` makes the state _readable_, which is a precondition for an app to surface it, but nothing warns on its own. Whether the diagnostic is the core's or the binding's is unsettled; listed so it is countable rather than invisible.                                                                                                                                      |
+| **SSR-1..3** — do not collect server-side; degrade loudly                  | `partial`       | `useWriteEnabled()` is SSR-safe by construction: it subscribes inside `onMount`, which never runs during server rendering, so capability stays `undefined` server-side — the honest answer, and the one that cannot leak one request's decision to another. The three components are client-only by construction (they build real DOM nodes) and documented as such. **Untested under real Solid SSR** — no SSR harness exists in this repo; graded `partial` rather than `provisional` for that reason. |
+| **WIRE-3** — lowercase `xx-yy` on the wire                                 | `delegated`     | Every locale path routes through the core: `createLocaleStore` and `solidToLocaleSource` hold the value and hand it to the core, which canonicalizes. The binding performs no locale string manipulation — probe for case/locale rewriting in `src/`: **0**. `canonicalizeLocale` is re-exported by reference so consumers normalize the same way the core does.                                                                                                                                         |
+| **WIRE-5** — reachable test double, documented where integrators look      | `provisional`   | `LangsysAppAPI` is re-exported by reference, so `setBaseUrl()` is reachable without an artifact edit, and the playground's `VITE_LANGSYS_API_URL` is documented in `.env.example` where an integrator looks. The binding introduces no `apiUrl` config of its own (BIND-4).                                                                                                                                                                                                                              |
+| **CACHE-1** — cache keys namespaced by project                             | `n-a`           | The binding holds no cross-session or shared cache. The only state it owns is per-component Solid signals, created and disposed with their owner. Nothing is process-external or shared by default, which is the hazard CACHE-1 names.                                                                                                                                                                                                                                                                   |
+| **CID-2** — no-category is `''`, never `null`/`undefined`                  | `provisional`   | Both components default with `?? ''`: `category: props.category ?? ''` and `custom_id: props.custom_id ?? ''` (`Translate.ts:59-60`), matching the rule exactly rather than forwarding `undefined`.                                                                                                                                                                                                                                                                                                      |
+
+## 3 — Delegation block: families the core owns
+
+The binding does not participate in any of these. Each row states the probe and the positive
+control that proves the probe works.
+
+**Probe method.** Every count is **code only** — comment and JSDoc lines are stripped before
+counting, because this binding's prose discusses `fetch`, `write_enabled` and `custom_id`
+constantly while its code does none of it. The exact filter:
+
+```bash
+probe() {  # $1 = pattern, $2 = tree
+  grep -rnE "$1" "$2" --include='*.ts' | grep -v '\.test\.ts' | grep -vE ':[0-9]+: *(\*|//|/\*)'
+}
+```
+
+| Family                                             | Probe pattern                                                                                                                   | Mine                           | Control (core) | Reading                                                                                                                                                                       |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CID-1..4** (`custom_id`)                         | `custom_id\|customId\|generateCustomId\|md5`                                                                                    | **2** — pass-through prop only | **37**         | **No generation, no hashing, no id derivation.** Both hits are `Translate.ts`: the prop declaration and `custom_id: props.custom_id ?? ''` handed verbatim to the core class. |
+| **ICU-1..5** (interpolation recovery)              | `intl-messageformat\|interpolate\|isICU\|plural`                                                                                | **0**                          | **15**         | Params pass through as `Record<string, ParamPrimitive>`; the core formats and recovers.                                                                                       |
+| **REG-1..12** (write lane)                         | `batch\|flush\|keepalive\|sendBeacon\|debounce\|queue`                                                                          | **0**                          | **42**         | No scheduling, batching, or teardown flush.                                                                                                                                   |
+| **BIND-3 / network**                               | `fetch\(\|XMLHttpRequest\|setTimeout\|setInterval\|retry\|backoff\|headers`                                                     | **0**                          | **17**         | No network behaviour of any kind.                                                                                                                                             |
+| **HINT-1..12** (discovery reports)                 | `location\|href\|hint\|discover\|fragment`                                                                                      | **0**                          | **25**         | The hint lane reads the URL **inside the core**. No Solid code is on that path — there is no seam here to conform through.                                                    |
+| **GATE-5, GATE-6** (bookkeeping, lane exclusivity) | `isContentBlockKnown\|registerContentBlock\|isPhraseMarked\|PHRASE_MARKER\|isTranslationExcluded\|sTranslations\.(set\|update)` | **2** — DOM contract only      | **28**         | No "already seen" bookkeeping; the binding never writes the catalog store. Both hits are the marker attribute, below.                                                         |
+| **GATE-3** (never persist the decision)            | `localStorage\|sessionStorage\|persist`                                                                                         | **0**                          | **6**          | This binding writes to no storage of any kind.                                                                                                                                |
+| **GATE-1** (server-computed capability)            | `write_enabled`                                                                                                                 | **0**                          | **7**          | The binding never reads the wire field; it forwards the core's signal.                                                                                                        |
+| **GATE-8** (key-type inference)                    | `key_type\|keyType`                                                                                                             | **0**                          | **12**         | **No `keyType` surface exists here at all** — nothing invites a consumer to gate on key type.                                                                                 |
+| **CACHE-1** (namespaced cache keys)                | `cacheKey\|persist\(\|setPersistStorage\|PersistStorage`                                                                        | **0**                          | **7**          | The binding owns no cache to namespace.                                                                                                                                       |
+
+> **A discarded probe, recorded because the lesson generalises.** CACHE-1 was first probed with
+> `createMemo|useMemo|cache\(|Map\(|WeakMap`. That returns **0 in this binding and 0 in the core** —
+> the positive control fails, so the probe proves nothing, and reporting the row on it would have
+> been a green tick backed by a search that could not have found anything. The replacement pattern
+> above describes what caching actually looks like in this core (`persist`, `PersistStorage`) and
+> its control fires. **A `delegated` grade is only as good as a control that fires**; when the
+> control comes back empty, the probe is wrong, not the code.
+
+**On the marker attribute.** `Phrase` stamps the phrase marker so a wrapping `<Translate>` skips
+it — DOM contract, not bookkeeping, and precisely the shape-adaptation BIND-1 sanctions. Worth
+noting against the sibling finding in `langsys-js-angular`: this binding **imports
+`PHRASE_MARKER_ATTR` from the core** rather than hardcoding the string, so there is no duplicated
+constant across the repo boundary to drift. `DontTranslate` additionally sets a
+`data-ls-dont-translate` attribute that the core reads nowhere — it works because it also sets
+`translate="no"`. Inert, and the same mild BIND-4 smell flagged in the Angular lane; carried here
+so the two can be resolved together rather than twice.
+
+## The silent-drop mechanism
+
+The reason the entire 838 surface was absent from this binding is worth recording, because the
+absence had **no symptom**.
+
+`LangsysApp` was a hand-written class that enumerated one delegating method per core method
+(`public refresh() { return _LangsysApp.refresh(); }`, twenty times over). Every method the core
+added _after_ that class was written silently vanished from this binding's public surface — with
+a green typecheck and a green suite, because nothing referenced what was missing.
+
+It had already happened **six times** when this audit found it. Measured against the core's
+prototype:
+
+| Core method                  | Reachable through the old class?     |
+| ---------------------------- | ------------------------------------ |
+| `setWriteGrant`              | **no** — the whole 838 grant surface |
+| `applyAuthorization`         | **no**                               |
+| `getUserLanguagePreferences` | **no**                               |
+| `parseAcceptLanguageHeader`  | **no**                               |
+| `findBestLocaleMatch`        | **no**                               |
+| `resolveLocale`              | **no**                               |
+
+Adding `setWriteGrant` to the list would have closed the gap and left the mechanism running for
+the next core release. So the fix is structural: forward by reference through a `Proxy`, override
+exactly two methods, and let `surface.test.ts` assert the **structure** — every core prototype
+method is reachable, and every non-overridden one is the core's own function object by identity.
+A test naming today's methods would have rotted into the same blind spot.
+
+Forwarded members are deliberately **unbound**. Binding them would make a destructured method keep
+working here while the identical destructure off the core singleton breaks — a behaviour
+difference, which is what BIND-1 forbids a binding from introducing. This is safe only because the
+core class uses no `#private` fields (verified); the identity assertion in `surface.test.ts` is
+what makes that stop being true loudly rather than silently.
+
+## The two 0.6.5s
+
+`langsys-js-typescript@0.6.5` **on npm** and `0.6.5` **in the local working copy** are different
+code under one version string: the 838 surface was added on top of the already-published 0.6.5
+without a bump. No version comparison distinguishes them.
+
+| probe                                   | published `0.6.5` | local `0.6.5` |
+| --------------------------------------- | ----------------- | ------------- |
+| `writeEnabled`                          | `undefined`       | `object`      |
+| `setWriteGrant`                         | `undefined`       | `function`    |
+| `autoDiscovery`                         | `undefined`       | `object`      |
+| `generateCustomId` _(positive control)_ | `function`        | `function`    |
+
+`src/upstream-precondition.test.ts` asserts this **by symbol, against the artifact
+`require.resolve` returns**, so an `npm ci` that silently swaps the link for the registry tarball
+is a red build rather than a silent bench swap.
+
+**Sharper here than in the sibling bindings.** This package still declares
+`langsys-js-typescript@^0.4.1` — a range that excludes 0.6.5 in _either_ form. The release wave
+owns that floor, so until it moves, the symlink is the only thing putting the 838 surface on the
+bench, and this test is the only thing that notices when it goes.
+
+**CONF-3 mutation evidence — observed, not staged.** This was not a rehearsed mutation. Partway
+through this branch, `npm install --save-dev @types/node` replaced the symlink with the registry
+tarball as a side effect. The precondition test went red immediately and named the cause:
+
+```
+× exports writeEnabled as object
+× exports setWriteGrant as function
+× exports autoDiscovery as object
+✓ resolves the package at all
+✓ loads (positive control: generateCustomId exists in every build)   ← load is fine
+```
+
+The positive control staying green is what made the three failures _evidence of absence_ rather
+than a broken import. Restored with `npm link ../langsys-js-typescript`. Every other test in the
+suite stayed green through the swap, which is exactly the blind spot this file exists to close.
+
+## Check-the-verifier
+
+Each new behaviour was mutated to confirm its test actually catches it. All three mutations were
+reverted; the suite is green at the recorded SHA.
+
+| Mutation                                                                   | Expected to break     | Result                                                                 |
+| -------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------- |
+| Seed `useWriteEnabled` from `writeEnabled.get()` (drop the mount guard)    | hydration + tri-state | **2 failed** — the seed test and the adoption test                     |
+| Snapshot the grant at adapt time instead of resolving per call             | GRANT-2               | **3 failed** — incl. the four-refresh login/logout cycle               |
+| Hide one core method from the proxy (re-create the enumerating blind spot) | BIND-6                | **2 failed** — the per-method forwarding test and the 838-surface test |
+
+## Open question — BIND-5 / GATE-2 / GATE-7 / CAT-1
+
+**Is the core's per-emit `TFunction` identity a contract, or an implementation detail?**
+
+`useT()` is `useSignal(tSignal)`, and `useSignal` wraps the value in Solid's `createSignal`, whose
+default equality is `===`. Behind it the core's own `set` guards with `Object.is`. Two equality
+gates in series, and **neither is defensive** — both are inert only because `buildTFn()` returns a
+fresh function identity on every emit.
+
+Measured (`createComputed` re-run count):
+
+| core emits                             | consumer re-renders          |
+| -------------------------------------- | ---------------------------- |
+| fresh identity per emit (today)        | **3** (initial + 2)          |
+| stable identity, mutated closure state | **1** — both emits swallowed |
+
+So a plausible core optimisation — memoising `buildTFn` to return a stable reference — would
+silently freeze every Solid consumer's UI, with **no failing test anywhere**, in this repo or the
+core's. The same gate sits in front of `useTranslations()`, where the core currently emits a fresh
+top-level object (`return { ...current }`).
+
+Per the ruling on this lane, **no defensive unwrap has been built** and the affected rows are
+filed `open` rather than graded. Routed to the **Typescript** lane via Reviewer
+(`838-intake-solid`). It generalises across every binding whose framework dedupes by identity.
+
+## Ranked gaps
+
+1. **BIND-5 identity coupling (above).** Invisible, untested, one core refactor from freezing
+   every consumer. Blocked on the Typescript ruling — deliberately not worked around.
+2. **No SSR harness.** `useWriteEnabled` is SSR-safe by construction (`onMount` never runs
+   server-side), and the components are client-only by construction, but neither is _tested_ under
+   real Solid SSR/hydration. The hydration guard is the one piece of this branch whose evidence is
+   structural rather than executed, which is why SSR-1..3 is `partial`.
+3. **`^0.4.1` cannot resolve the reland.** Local symlink hides it; CI and any real install pull
+   0.4.x. Owned by the release wave, guarded here by the precondition test.
+4. **OBS-1 diagnostic absent.** Needs an owner decision (core or binding) before it can be graded.
+5. **`data-ls-dont-translate` is inert** — a binding-invented DOM contract the core reads nowhere.
+   Shared with the Angular lane; resolve once, both places.
+
+## Reproducing this file's evidence
+
+```bash
+npm link ../langsys-js-typescript   # bench: local core, not the registry tarball
+npm test                            # 55 tests, 6 files — includes the precondition
+npm run typecheck
+npm run build
+```
+
+Every probe in this file is the `probe()` filter from §3 — a `grep` over `src/`, excluding
+`*.test.ts` **and comment lines** — paired with the identical probe over
+`langsys-js-typescript/src/` as its positive control. Patterns are stated inline per row so they
+can be re-run rather than trusted, and a probe whose control returns zero is reported as a broken
+probe rather than a passing row.

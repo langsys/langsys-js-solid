@@ -79,13 +79,14 @@ on the server render plain markup and hydrate.
 
 ## Reactive primitives
 
-| Primitive | Returns | Wraps |
-| --- | --- | --- |
-| `useT()` | `Accessor<TFunction>` | the live translation function |
-| `useCurrentLocale()` | `Accessor<string>` | the locale whose catalog is loaded |
-| `useTranslations()` | `Accessor<iCategories>` | the raw catalog |
-| `useLocaleStore(initial?)` | `{ locale, setLocale, store }` | store + accessor in one |
-| `useSignal(signal)` | `Accessor<T>` | any base-SDK signal |
+| Primitive                  | Returns                          | Wraps                                     |
+| -------------------------- | -------------------------------- | ----------------------------------------- |
+| `useT()`                   | `Accessor<TFunction>`            | the live translation function             |
+| `useCurrentLocale()`       | `Accessor<string>`               | the locale whose catalog is loaded        |
+| `useTranslations()`        | `Accessor<iCategories>`          | the raw catalog                           |
+| `useWriteEnabled()`        | `Accessor<boolean \| undefined>` | whether this session may register content |
+| `useLocaleStore(initial?)` | `{ locale, setLocale, store }`   | store + accessor in one                   |
+| `useSignal(signal)`        | `Accessor<T>`                    | any base-SDK signal                       |
 
 Already own the locale as a Solid signal? Adapt it instead of migrating:
 
@@ -96,6 +97,55 @@ const [locale, setLocale] = createSignal('en-US');
 LangsysApp.init({ ..., UserLocaleStore: solidToLocaleSource(locale, setLocale) });
 setLocale('fr-FR'); // SDK loads French
 ```
+
+## Write capability
+
+Whether a session may register new content is decided by the **server**, per
+session — the same key answers differently from different addresses — so it is
+never inferred from the key. Read it with `useWriteEnabled()`:
+
+```tsx
+import { useWriteEnabled } from 'langsys-js-solid';
+
+function EditBadge() {
+    const writeEnabled = useWriteEnabled();
+    return (
+        <Show when={writeEnabled() !== undefined} fallback={<span>Checking…</span>}>
+            <Show when={writeEnabled()}>
+                <span>Editing enabled</span>
+            </Show>
+        </Show>
+    );
+}
+```
+
+It is **tri-state**, and the third state matters: `undefined` means _not decided
+yet_ (authorization still in flight, a server render, or hydration not finished),
+not "no". Gate on `=== true` and render something for `undefined` — treating
+`undefined` as `false` turns a pending check into a permanent denial.
+
+The accessor stays `undefined` until the component mounts. That is deliberate:
+capability is browser-authoritative, so the server never renders it, and seeding
+it earlier would make the first client render disagree with the server's HTML.
+
+### Write grants
+
+Login-walled apps supply a short-lived grant. Grants live about five minutes
+while an app inits once and runs for hours, so pass a **signal or a callback**,
+never a bare string — it is read afresh on every request:
+
+```ts
+const [grant, setGrant] = createSignal<string | null>(null);
+
+await LangsysApp.init({ projectid, key, UserLocaleStore: locale, writeGrant: grant });
+
+setGrant(await login()); // capability re-derives; misses from here register directly
+```
+
+If the token only exists after login, still configure the provider at `init`
+(returning `null` until then) rather than leaving `writeGrant` unset — an unset
+grant tells the SDK no grant can ever arrive. To supply one later, `await
+LangsysApp.setWriteGrant(grant)`, which re-authorizes rather than just storing it.
 
 ## Playground
 

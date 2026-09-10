@@ -57,7 +57,7 @@ after first publish.
 | Rule                                                              | Grade         | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | ----------------------------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **BIND-1** — adapt shape/timing, never meaning                    | `provisional` | Adaptation is confined to Solid's execution model: SDK `Signal` → Solid `Accessor` (`useSignal`), `createRoot`/`createComputed` for the locale adapter, mount/destroy component glue, and the hydration timing in `useWriteEnabled`. The one adapter BIND-1 names as its worked trap — grant provider resolution — is per call and **mutation-tested**: snapshotting turns 3 tests red. The locale store is asserted to round-trip input **verbatim** (`rendered.test.tsx`), so the binding cannot drift from the core's canonicalization by quietly normalizing on its own. Raw `writeEnabled` is deliberately **not** re-exported — reading it synchronously is the hydration hazard `useWriteEnabled()` exists to avoid — and that absence is marked at the export site _and_ pinned by an assertion, so re-adding it lands red.                                                                                                                                                                                                                                                                                                                                                                               |
-| **BIND-2** — never branch on server-computed capability           | `provisional` | `useWriteEnabled()` surfaces the core's `writeEnabled` **unchanged** and branches on nothing. Probe for `write_enabled`/`key_type`/`keyType` in `src/`: **0**, control **7** and **12** in the core. This binding exposes **no `keyType` at all** — the capability signal it offers is the one GATE-1 mandates, not the one GATE-1 forbids deciding from.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **BIND-2** — never branch on server-computed capability           | `provisional` | `useWriteEnabled()` surfaces the core's `writeEnabled` **unchanged** and branches on nothing. Probe for `write_enabled`/`key_type`/`keyType` in `src/`: **0**, control **9** and **18** in the core. This binding exposes **no `keyType` at all** — the capability signal it offers is the one GATE-1 mandates, not the one GATE-1 forbids deciding from.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | **BIND-3** — owns no network behaviour                            | `delegated`   | Code-only probe (§3 method) for `fetch\|XMLHttpRequest\|setTimeout\|setInterval\|retry\|backoff\|headers`: **0 in this binding, 17 in the core.** No scheduling, no request construction, no header setting. The binding never touches a URL at all.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | **BIND-4** — introduces no configuration the core does not define | `provisional` | `iLangsysInitConfig` adds **no new keys**. It re-types two the core already defines: `UserLocaleStore` (`Signal<string>`, which the core's own type already is) and `writeGrant` (widened to accept a Solid accessor — an arm structurally identical to the core's existing callback arm). No `discovery`, `hint`, `suppress`, interval or threshold option exists; probe **0**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | **BIND-5** — does not cache lookup results                        | `delegated`   | **Closed by ruling as conforming-by-absence.** Registration is idempotent per tuple and discovery requires re-entry **per URL** (`translations.ts:277` records the miss _before_ the `sameToken` dedup at `:287-290`, keyed on `location.href` throughout `discovery.ts`) — so the rule bites only bindings carrying a **lookup cache** in front of `t()`. This binding has none: probe for `createMemo\|useMemo\|cache(` → **0** (control: 15 reactive primitives in use). Its two `===` equality gates govern **re-rendering**, not lookup suppression. Verified by measurement, not inference: on a simulated navigation a re-mounted component re-enters `t()` while a persistent one does not (1 of 2) — Solid's own render semantics, identical to using the core directly, and not a binding-authored cache. (TS ruling, `838-intake-solid`, citations at core `6cdb388`.)                                                                                                                                                                                                                                                                                                                                 |
@@ -71,9 +71,9 @@ graded on those.
 
 | Rule                                                                       | Grade         | Evidence                                                                                                                                                                                                                                                                                                                                                                                              |
 | -------------------------------------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **GATE-1** — decide from `write_enabled`, never `key_type`                 | `delegated`   | The binding makes no register-or-report decision. Probe for `write_enabled` in `src/`: **0**; positive control **7** in the core. `useWriteEnabled()` reads the core's signal and forwards it; it never computes a decision.                                                                                                                                                                          |
+| **GATE-1** — decide from `write_enabled`, never `key_type`                 | `delegated`   | The binding makes no register-or-report decision. Probe for `write_enabled` in `src/`: **0**; positive control **9** in the core. `useWriteEnabled()` reads the core's signal and forwards it; it never computes a decision.                                                                                                                                                                          |
 | **GATE-2** — collect always; choose the lane at the send site              | `delegated`   | **Closed by the same ruling.** The binding never collects or sends, and — the open concern — it does not suppress the `t()` call that feeds collection, since it holds no lookup cache (BIND-5 row). The lane choice happens at the core's flush site (`translations.ts:280-284`), which this binding cannot reach.                                                                                   |
-| **GATE-3** — never persist the write decision                              | `delegated`   | Probe for `localStorage\|sessionStorage\|persist`: **0 in this binding, 6 in the core.** `useWriteEnabled` holds its value in a Solid signal owned by the calling component and disposed with it — asserted in `capability.test.ts` ("stops observing the core once the owning root is disposed"). Nothing outlives the page session.                                                                 |
+| **GATE-3** — never persist the write decision                              | `delegated`   | Probe for `localStorage\|sessionStorage\|persist`: **0 in this binding, 7 in the core.** `useWriteEnabled` holds its value in a Solid signal owned by the calling component and disposed with it — asserted in `capability.test.ts` ("stops observing the core once the owning root is disposed"). Nothing outlives the page session.                                                                 |
 | **GATE-4** — strip the decision from whatever you cache                    | `n-a`         | The binding caches no response envelope and no catalog. There is nothing here for a write decision to be embedded in.                                                                                                                                                                                                                                                                                 |
 | **GATE-7** — every detecting path feeds exactly one lane                   | `delegated`   | **Closed by the same ruling.** Per-URL discovery lives core-side and is ordered before the registration dedup by construction. No Solid code sits between a miss and its lane.                                                                                                                                                                                                                        |
 | **GATE-8** — missing `write_enabled` is a version signal, never permission | `provisional` | The binding's obligation is not to collapse the tri-state, and it does not: `useWriteEnabled()` returns `Accessor<boolean \| undefined>` and **`undefined` is never defaulted to `false`** — asserted explicitly, and `false` is asserted to remain distinguishable from `undefined` once resolved (`capability.test.ts`). The version-signal inference itself is the core's and is not reached here. |
@@ -91,7 +91,7 @@ graded on those.
 
 | **GRANT-1** — provider callback, documented as the default form | `provisional` | `writeGrant` accepts a string, a sync/async callback, **or a Solid accessor**. The README documents the signal/callback form as the default and states why the string form is quickstart-only (grants live ~5 min; an app inits once). |
 | **GRANT-2** — resolve the grant per request; never cache the token | `provisional` | `adaptWriteGrant` returns `() => untrack(grant)` — resolved on **every** call, never at adapt time. This is BIND-1's named costume trap and is the one row here proven by mutation: replacing it with a snapshot turns 3 tests red, including one that refreshes the token four times through a login/logout cycle. |
-| **GRANT-3** — `setWriteGrant()` must re-authorize, not merely set config | `delegated` | `LangsysApp.setWriteGrant` adapts the grant shape and delegates to the core's method, which owns the re-authorization. The binding adds no configuration-only path. Probe: the binding contains no authorization logic (`applyAuthorization` is forwarded by reference, not re-implemented — asserted in `surface.test.ts`). |
+| **GRANT-3** — `setWriteGrant()` must re-authorize, not merely set config | `delegated` | `LangsysApp.setWriteGrant` adapts the grant shape and delegates to the core's method, which owns the re-authorization. The binding adds no configuration-only path. Probe: the binding contains no authorization logic — `applyAuthorization` is forwarded as a **bound delegate** of the core, not re-implemented, which `surface.test.ts` asserts by checking the forwarded function reports `bound applyAuthorization` (a reimplementation would carry its own name). |
 | **GRANT-4** — send the grant as `X-Write-Grant` | `delegated` | Header construction is the core's; BIND-3 probe confirms the binding sets no headers (**0** vs **17**). |
 | **OBS-1** — surface an unusable capability at least once | `delegated` | **Ownership settled core-side since the last revision.** The core added `noticeUnusableWriteCapability`, called from its own `applyAuthorization` on both the init and grant-change paths, latched on the _outcome_ so a re-auth that changes the answer re-reports while one that changes nothing stays quiet. The binding does not participate and needs no action: probe for `warn\|console.\|diagnostic\|notice\|logger` in `src/` → **0**, control **51** in the core. Was `partial` (gap) while the owner was unsettled. |
 | **SSR-1..3** — do not collect server-side; degrade loudly | `provisional` | **Now executed, not reasoned.** `capability.ssr.test.tsx` runs against Solid's **server build** (`vitest.ssr.config.mts`) and asserts `useWriteEnabled()` renders the undecided branch even when the core already holds `true` — and separately that a `false` does not leak either. Positive control asserts `isServer` and that `renderToString` really renders, so the browser build cannot make these vacuous. The guard is `onMount`, which never runs server-side. Mutation-checked: seeding eagerly turns both SSR assertions red. The three components remain client-only by construction and documented as such. |
@@ -99,6 +99,10 @@ graded on those.
 | **WIRE-5** — reachable test double, documented where integrators look | `provisional` | `LangsysAppAPI` is re-exported by reference, so `setBaseUrl()` is reachable without an artifact edit, and the playground's `VITE_LANGSYS_API_URL` is documented in `.env.example` where an integrator looks. The binding introduces no `apiUrl` config of its own (BIND-4). |
 | **CACHE-1** — cache keys namespaced by project | `n-a` | The binding holds no cross-session or shared cache. The only state it owns is per-component Solid signals, created and disposed with their owner. Nothing is process-external or shared by default, which is the hazard CACHE-1 names. |
 | **CID-2** — no-category is `''`, never `null`/`undefined` | `provisional` | Both components default with `?? ''`: `category: props.category ?? ''` and `custom_id: props.custom_id ?? ''` (`Translate.ts:59-60`), matching the rule exactly rather than forwarding `undefined`. |
+
+> **All control figures in this file — inline in §2 and tabulated in §3 — are computed against
+> the same core revision, `cfe8d40` (the linked working copy, `c010f32`). They were re-derived
+> together on 2026-09-10; none is carried over from an earlier core.**
 
 ## 3 — Delegation block: families the core owns
 
@@ -113,6 +117,24 @@ constantly while its code does none of it. The exact filter:
 probe() {  # $1 = pattern, $2 = tree
   grep -rnE "$1" "$2" --include='*.ts' | grep -v '\.test\.ts' | grep -vE ':[0-9]+: *(\*|//|/\*)'
 }
+```
+
+**The patterns in the table below are markdown-escaped** (`\|` for the alternation, so the pipes do
+not break the table cells). Pasted verbatim into `probe()` every row returns 0 — _including the
+control_, which is the signature of a broken probe rather than a clean binding. Unescaped copies,
+ready to paste:
+
+```bash
+CID='custom_id|customId|generateCustomId|md5'
+ICU='intl-messageformat|interpolate|isICU|plural'
+REG='batch|flush|keepalive|sendBeacon|debounce|queue'
+NET='fetch\(|XMLHttpRequest|setTimeout|setInterval|retry|backoff|headers'
+HINT='location|href|hint|discover|fragment'
+GATE56='isContentBlockKnown|registerContentBlock|isPhraseMarked|PHRASE_MARKER|isTranslationExcluded|sTranslations\.(set|update)'
+GATE3='localStorage|sessionStorage|persist'
+GATE1='write_enabled'
+GATE8='key_type|keyType'
+CACHE1='cacheKey|persist\(|setPersistStorage|PersistStorage'
 ```
 
 | Family                                             | Probe pattern                                                                                                                   | Mine                           | Control (core) | Reading                                                                                                                                                                       |
@@ -171,8 +193,9 @@ class": `setWriteGrant`, `applyAuthorization`, `getUserLanguagePreferences`,
 `parseAcceptLanguageHeader`, `findBestLocaleMatch`, `resolveLocale`.
 
 **New text.** **One** public member was genuinely dropped — `setWriteGrant`, the whole write-grant
-surface. The other five are declared `private` in the core and appear in **no `.d.ts` at all**; they
-were never API, so they could not be dropped from one.
+surface. The other five are declared `private` in the core and emitted into the `.d.ts` as bare
+`private name;` declarations — **name only, no signature** — which TypeScript refuses to any caller
+outside the class. They were never API, so they could not be dropped from one.
 
 | Core member                  | Visibility                     | Genuinely dropped API?  |
 | ---------------------------- | ------------------------------ | ----------------------- |
@@ -188,6 +211,48 @@ Provenance: `git -C ~/Documents/dev/langsys-js-typescript show cfe8d40:src/langs
 with `grep -nE '^\s+(private|public|protected)\s+(async\s+)?<name>\('`; `.d.ts` presence checked
 against the built artifact this repo actually resolves. Also verified private at core `6cdb388`, the
 commit live when the original claim was written — so the fact was checkable at the time.
+
+### Correction (2026-09-10) — the correction's own measurement was false
+
+The record above originally claimed the five members "appear in **no `.d.ts` at all**", and called
+that _stronger_ than "declared private". **It was false, and it was false by the same mechanism the
+correction was written to expose.**
+
+They are in the built `.d.ts`, at fixed lines:
+
+```
+$ grep -nE '^\s+private [A-Za-z]+;' dist/index.d.ts
+548:    private applyAuthorization;
+596:    private getUserLanguagePreferences;
+597:    private parseAcceptLanguageHeader;
+598:    private findBestLocaleMatch;
+604:    private resolveLocale;
+```
+
+**Why the instrument could not see them.** The probe used was
+`grep -nE '^\s+(private )?NAME[(:]' dist/index.d.ts` — anchored on a `(` or `:` after the name,
+because it was written for members that have a _signature_. TypeScript does not emit a signature
+for a private member: it elides the type entirely and writes `private name;`. So the pattern
+returned **0 for all five**, while the positive control `getCountries` — which is public and
+therefore _does_ carry a signature at `:558` — matched. **The control fired, so the false negative
+read as a verified fact.**
+
+That is precisely the failure the first correction describes: a measurement whose instrument cannot
+resolve the distinction it is being used to draw, with a control that passes anyway because it
+differs from the subjects in the very property the instrument keys on. The first correction found it
+in a runtime prototype walk; this one repeated it one layer up, in the `.d.ts` read that was
+supposed to be the authority. **Two measurements sharing a method share its blind spot — including a
+corrected one.**
+
+**What actually holds.** The conclusion is unchanged and now rests on the right fact: `private
+name;` in a `.d.ts` is inaccessible to every caller outside the class (measured: accessing one
+through the core's own type is `TS2341`), so the five were never API and `setWriteGrant` remains the
+only genuine drop. The correct instrument for "is this member private in the emitted types" is
+`grep -nE '^\s+private [A-Za-z]+;'` — keyed on the _shape of a private declaration_, not on the
+shape of a signature.
+
+**Also wrong in the same way, and not editable:** the pushed commit message of `3f90503` carries the
+"no `.d.ts` at all" claim. It stands in the history uncorrected; this record is the correction.
 
 **Why the error happened, and why it generalises.** The claim came from a runtime walk of the
 core's prototype (`Object.getOwnPropertyNames`). **TypeScript's `private` is erased at compile time**
@@ -205,18 +270,35 @@ Adding `setWriteGrant` to the old list would have closed the one real gap and le
 running. A test naming today's methods would have rotted into the same blind spot.
 
 **It has since caught a real one, unprompted.** While this branch was open, the core added
-`noticeUnusableWriteCapability` (its OBS-1 diagnostic). This binding forwarded it and
-`surface.test.ts` began asserting it **with no edit here** — the suite went 66 → 67 browser tests on
-a docs-only commit, which is how the addition was noticed at all. Under the old enumerating class
-that method would have been dropped exactly as `setWriteGrant` was: silently, with a green suite and
-a green typecheck. The structural test is not a hypothetical guard against a future regression; it
-absorbed a live core addition during the wave it was written in.
+`noticeUnusableWriteCapability` (its OBS-1 diagnostic) as a method on the class. This binding
+forwarded it and `surface.test.ts` began asserting it **with no edit here** — the suite went 66 → 67
+browser tests on a docs-only commit, which is how the addition was noticed at all. Under the old
+enumerating class it would have been dropped exactly as `setWriteGrant` was: silently, with a green
+suite and a green typecheck. The structural test is not a hypothetical guard against a future
+regression; it absorbed a live core addition during the wave it was written in.
 
-Forwarded members are deliberately **unbound**. Binding them would make a destructured method keep
-working here while the identical destructure off the core singleton breaks — a behaviour
-difference, which is what BIND-1 forbids a binding from introducing. This is safe only because the
-core class uses no `#private` fields (verified); the identity assertion in `surface.test.ts` is
-what makes that stop being true loudly rather than silently.
+> **Follow-up, and it makes the same point from the other side (2026-09-10).** That method has since
+> moved _out_ of the class — it is a standalone exported function as of core `c1cf492` — so the
+> prototype no longer carries it and the walk no longer produces a row for it. The suite absorbed
+> the removal exactly as it absorbed the addition, again with no edit here. A hand-maintained list
+> would now be wrong in the opposite direction: asserting a member that no longer exists, which
+> fails loudly, or quietly keeping a dead name that reads as coverage.
+
+> **Superseded (2026-09-10) — this paragraph is the OLD rationale, kept for the record.** It read:
+>
+> > ~~Forwarded members are deliberately **unbound**. Binding them would make a destructured method
+> > keep working here while the identical destructure off the core singleton breaks — a behaviour
+> > difference, which is what BIND-1 forbids a binding from introducing. This is safe only because
+> > the core class uses no `#private` fields (verified); the identity assertion in
+> > `surface.test.ts` is what makes that stop being true loudly rather than silently.~~
+>
+> **Methods are now bound to the core**, and the argument above is answered in
+> [Destructuring](#destructuring--measured-and-a-deliberate-divergence-from-the-core): surviving
+> destructuring is a calling convention, not product behaviour, and the `#private` clause was the
+> tell — it named an invariant this repository does not own as the thing keeping the design safe.
+> Accessors are still forwarded untouched, and their identity is still asserted. Left in place
+> rather than deleted because a reader arriving at this section first would otherwise meet a
+> rationale the rest of the file contradicts.
 
 ## Rendered-template evidence
 
@@ -411,20 +493,23 @@ suite stayed green through the swap, which is exactly the blind spot this file e
 
 ## Check-the-verifier
 
-Each new behaviour was mutated to confirm its test actually catches it. All nine mutations were
-reverted; the suite is green at the recorded SHA.
+Each new behaviour was mutated to confirm its test actually catches it. All ten mutations were
+reverted; the suite is green at the recorded SHA. **Every row below was re-measured at this tip on
+2026-09-10, against current test names — the counts are not carried forward from when the table was
+first written, and three of them had drifted.**
 
-| Mutation                                                                                            | Expected to break     | Result                                                                                     |
-| --------------------------------------------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------ |
-| Seed `useWriteEnabled` from `writeEnabled.get()` (drop the mount guard)                             | hydration + tri-state | **2 failed** — the seed test and the adoption test                                         |
-| Snapshot the grant at adapt time instead of resolving per call                                      | GRANT-2               | **3 failed** — incl. the four-refresh login/logout cycle                                   |
-| Hide one core method from the proxy (re-create the enumerating blind spot)                          | BIND-6                | **2 failed** — the per-method forwarding test and the 838-surface test                     |
-| Subscribe but never propagate — **the Angular failure shape** (value arrives, framework never told) | repaint               | **4 failed** — 2 accessor, **2 rendered-template**                                         |
-| Seed eagerly, dropping the `onMount` guard, checked against the SSR project                         | SSR-1..3              | **2 failed** — both server-render assertions; the browser project alone could not see this |
-| Widen the exported type so core-private members are reachable                                       | BIND-6 v2(b)/(c)      | **4 failed** — the non-zero-exit assertion and 3 of the 5 TS2339 rows                      |
-| Stop binding (revert to unbound forwarding)                                                         | BIND-6 v2(e)          | **3 failed** — bound-delegate, override set-equality, and destructuring                    |
-| Bind on every read with no cache (the sibling Svelte shape)                                         | referential stability | **1 failed** — only the stability assertion, which is the property the cache adds          |
-| Bind accessors as well as methods (the bug shipped in `3f90503`)                                    | identity contract     | **2 failed** — `LangsysApp.t` identity, and the accessor sweep                             |
+| Mutation                                                                                            | Expected to break     | Result                                                                                                                                                                                                          |
+| --------------------------------------------------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Seed `useWriteEnabled` from `writeEnabled.get()` (drop the mount guard)                             | hydration + tri-state | **2 failed** — the seed test and the adoption test                                                                                                                                                              |
+| Snapshot the grant at adapt time instead of resolving per call                                      | GRANT-2               | **3 failed** — incl. the four-refresh login/logout cycle                                                                                                                                                        |
+| Hide a **non-override** core method from the proxy — `if (prop === 'refresh') return undefined`     | BIND-6                | **3 failed** — `forwards refresh`, the bound-delegate sweep, and override set-equality                                                                                                                          |
+| Hide the **override** instead — `if (prop === 'setWriteGrant') return undefined`                    | BIND-6                | **2 failed** — `forwards setWriteGrant` and the dropped-public-member pin. Recorded separately because the count depends on which member is hidden, and a table row that does not say which is not reproducible |
+| Subscribe but never propagate — **the Angular failure shape** (value arrives, framework never told) | repaint               | **4 failed** — 2 accessor, **2 rendered-template**                                                                                                                                                              |
+| Seed eagerly, dropping the `onMount` guard, checked against the SSR project                         | SSR-1..3              | **2 failed** — both server-render assertions; the browser project alone could not see this                                                                                                                      |
+| Widen the exported type — `Record<string, any> &` before the `Omit<…>`                              | BIND-6 v2(b)/(c)      | **6 failed** of 7 in `type-surface.test.ts`: the non-zero-exit row and all five `TS2339` rows. Only the positive control survives, which is the point of having one                                             |
+| Stop binding — return the raw function instead of the cached bind                                   | BIND-6 v2(e)          | **4 failed** — bound-delegate sweep, override set-equality, the SYNC destructuring row, and `methods ARE still bound`                                                                                           |
+| Bind on every read with no cache (the sibling Svelte shape)                                         | referential stability | **1 failed** — only the stability assertion, which is the property the cache adds                                                                                                                               |
+| Bind accessors as well as methods (the bug shipped in `3f90503`)                                    | identity contract     | **2 failed** — `LangsysApp.t` identity, and the accessor sweep                                                                                                                                                  |
 
 ## Resolved — BIND-5 / GATE-2 / GATE-7 / CAT-1, and the identity contract
 

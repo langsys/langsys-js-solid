@@ -17,8 +17,10 @@ import { LangsysApp } from './index.js';
  * An earlier version of this comment said **six** members had been dropped,
  * naming `applyAuthorization`, `getUserLanguagePreferences`,
  * `parseAcceptLanguageHeader`, `findBestLocaleMatch` and `resolveLocale`
- * alongside `setWriteGrant`. Those five are `private` in the core and appear in
- * no `.d.ts`; they were never API. The claim came from the runtime prototype
+ * alongside `setWriteGrant`. Those five are `private` in the core and reach the
+ * `.d.ts` only as bare `private name;` declarations — no signature, inaccessible
+ * to any caller outside the class. They were never API. The claim came from the
+ * runtime prototype
  * walk below, and **TypeScript's `private` is erased at runtime** — so
  * `getOwnPropertyNames` surfaces implementation detail and cannot distinguish
  * it from public surface. The walk was right; the conclusion drawn from it was
@@ -50,8 +52,12 @@ const CORE_PRIVATE = new Set([
     'parseAcceptLanguageHeader',
     'findBestLocaleMatch',
     'resolveLocale',
-    'noticeUnusableWriteCapability',
 ]);
+// `noticeUnusableWriteCapability` was briefly a private method here. It moved out
+// of the class at core `c1cf492` and is now a standalone exported function, so it
+// is no longer on the prototype and the walk below never sees it. Kept as a note
+// rather than a set entry: a name in `CORE_PRIVATE` that the walk cannot produce
+// is dead weight that reads as coverage.
 
 const label = (name: string) =>
     CORE_PRIVATE.has(name) ? `${name} [core-private, forwarded uniformly, not API]` : name;

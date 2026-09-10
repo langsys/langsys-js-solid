@@ -7,8 +7,9 @@
  * component glue.
  *
  * Public API:
- *   - `LangsysApp` — the base SDK's singleton forwarded **by reference**, with
- *     two narrow overrides: `init` (accepts a `Signal<string>` for the user
+ *   - `LangsysApp` — the base SDK's singleton, forwarded so that **methods are
+ *     bound to the core** and **accessors and state pass through by reference**,
+ *     with two narrow overrides: `init` (accepts a `Signal<string>` for the user
  *     locale and a Solid accessor for `writeGrant`) and `setWriteGrant`.
  *   - Primitives — `useT`, `useCurrentLocale`, `useTranslations`,
  *     `useWriteEnabled`, `useLocaleStore`, and the low-level `useSignal`. These
@@ -169,8 +170,9 @@ const overrides = {
 } as const;
 
 /**
- * Solid SDK entry point — the base SDK's singleton, forwarded **by reference**,
- * with the two narrow overrides above.
+ * Solid SDK entry point — the base SDK's singleton, forwarded with the two narrow
+ * overrides above: **methods bound to the core**, **accessors and state by
+ * reference**.
  *
  * ## Why a proxy and not a wrapper class
  * This was a hand-written class enumerating one delegating method per core
@@ -184,8 +186,10 @@ const overrides = {
  * `getUserLanguagePreferences`, `parseAcceptLanguageHeader`,
  * `findBestLocaleMatch` and `resolveLocale` alongside `setWriteGrant`. That was
  * wrong, and wrong in a way worth recording. Those five are declared `private`
- * in the core (`langsys-app.ts:84/494/513/537/567`) and appear in no `.d.ts` at
- * all — they were never API. TypeScript's `private` is erased at runtime, so
+ * in the core (`langsys-app.ts:84/494/513/537/567`) and reach the `.d.ts` only as
+ * bare `private name;` declarations — name only, no signature — which TypeScript
+ * refuses to every caller outside the class. They were never API. `private` is
+ * erased at RUNTIME, however, so
  * the `getOwnPropertyNames` walk that produced the claim was reading
  * implementation detail and could not tell it from surface. **One** public
  * member was genuinely dropped: `setWriteGrant`.

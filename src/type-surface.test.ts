@@ -11,9 +11,19 @@ import { dirname, resolve } from 'node:path';
  * TypeScript's `private` is erased at runtime and `getOwnPropertyNames` cannot
  * see it. That uniform forwarding is fine — it is what keeps a future public
  * member from being dropped — but it means the runtime surface is *wider than
- * the API*. The only thing holding the line is the exported type
- * (`Omit<typeof _LangsysApp, …>`, which inherits the core's `private`
- * modifiers), and nothing was asserting that.
+ * the API*. The only thing holding the line is the exported type, and nothing
+ * was asserting that.
+ *
+ * **The mechanism, stated precisely, because the error code depends on it.**
+ * `Omit<typeof _LangsysApp, …>` is a mapped type over `keyof`, and `keyof`
+ * **drops private members entirely** — it does not carry their `private`
+ * modifier through. So on the exported type these five simply do not exist,
+ * which is `TS2339` ("Property does not exist"). Accessing the same member on
+ * the *raw* core type instead yields `TS2341` ("Property is private and only
+ * accessible within class"), measured. The assertions below are therefore
+ * coupled to the **mapped-type shape** of the export: replacing `Omit<…>` with
+ * the raw core type would still reject the members, but with a different code,
+ * and these rows would fail for a reason that is not a regression.
  *
  * Without this test, someone "simplifying" the export to `any`, to
  * `Record<string, unknown>`, or to a hand-written interface listing what the

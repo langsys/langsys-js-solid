@@ -1,7 +1,8 @@
 // NEGATIVE PROBE — must NOT compile.
 //
-// The five members below are `private` in the core and appear in no `.d.ts`.
-// TypeScript erases `private` at runtime, so the proxy forwards them; the
+// The five members below are `private` in the core, reaching the `.d.ts` only
+// as bare `private name;` declarations — no signature, inaccessible outside the
+// class. TypeScript erases `private` at runtime, so the proxy forwards them; the
 // EXPORTED TYPE must still refuse them, or this binding would be presenting
 // core implementation detail as its own API.
 //

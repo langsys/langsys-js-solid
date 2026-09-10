@@ -56,6 +56,20 @@ const CORE_PRIVATE = new Set([
 const label = (name: string) =>
     CORE_PRIVATE.has(name) ? `${name} [core-private, forwarded uniformly, not API]` : name;
 
+/** True when `prop` resolves to an accessor (getter) anywhere on the chain. */
+function isAccessor(prop: string): boolean {
+    for (let o: object | null = coreLangsysApp as object; o; o = Object.getPrototypeOf(o) as object | null) {
+        const d = Object.getOwnPropertyDescriptor(o, prop);
+        if (d) return typeof d.get === 'function';
+    }
+    return false;
+}
+
+/** Accessors are forwarded UNBOUND — their computed value's identity is a contract. */
+const coreAccessorNames = () => coreMethodNames().filter(isAccessor);
+/** Real methods (data properties holding functions) are bound to the core. */
+const coreBoundableNames = () => coreMethodNames().filter((n) => !isAccessor(n));
+
 function coreMethodNames(): string[] {
     const proto = Object.getPrototypeOf(coreLangsysApp) as object;
     const core = coreLangsysApp as unknown as Record<string, unknown>;
@@ -74,8 +88,8 @@ describe('BIND-6 — the binding forwards the core surface', () => {
         expect(typeof (LangsysApp as unknown as Record<string, unknown>)[name as string]).toBe('function');
     });
 
-    it('forwards non-overridden members as bound delegates of the core, not reimplementations', () => {
-        const forwarded = coreMethodNames().filter((n) => !INTENTIONAL_OVERRIDES.has(n));
+    it('forwards non-overridden METHODS as bound delegates of the core, not reimplementations', () => {
+        const forwarded = coreBoundableNames().filter((n) => !INTENTIONAL_OVERRIDES.has(n));
         expect(forwarded.length).toBeGreaterThan(0); // positive control
 
         for (const name of forwarded) {
@@ -101,7 +115,9 @@ describe('BIND-6 — the binding forwards the core surface', () => {
     });
 
     it('overrides exactly the members it means to, and no more', () => {
-        const overridden = coreMethodNames().filter((name) => {
+        // Accessors are excluded: they are forwarded unbound by design, so the
+        // `bound <name>` heuristic would misread every one of them as an override.
+        const overridden = coreBoundableNames().filter((name) => {
             const mine = (LangsysApp as unknown as Record<string, unknown>)[name] as { name?: string };
             const theirs = (coreLangsysApp as unknown as Record<string, unknown>)[name] as { name?: string };
             // An override is ours, so it is NOT a `bound <core name>` delegate.
@@ -184,5 +200,60 @@ describe('BIND-1 — `writeEnabled` is deliberately NOT re-exported raw', () => 
 
         const publicSurface = (await import('./index.js')) as Record<string, unknown>;
         expect(typeof publicSurface.useWriteEnabled).toBe('function');
+    });
+});
+
+describe('BIND-6 — accessors are forwarded UNBOUND (the identity contract)', () => {
+    /**
+     * `LangsysApp.t` is a getter returning the live `TFunction`. That closure's
+     * **identity** is the core's reactivity contract, pinned core-side at
+     * `cd07df1`: a fresh reference per catalog/locale change, stable between
+     * changes, because `Signal.set` drops an `Object.is`-equal value and
+     * identity is therefore the change signal every binding subscribes to.
+     *
+     * Binding it would mint a wrapper on every read. Re-rendering would still
+     * *look* correct while `LangsysApp.t === tSignal.get()` quietly stopped
+     * holding — the silent shape this whole lane exists to catch. So methods
+     * are bound and accessors are not.
+     */
+    it('LangsysApp.t is the core TFunction itself, not a bound wrapper', async () => {
+        const core = (await import('langsys-js-typescript')) as unknown as {
+            LangsysApp: { t: unknown };
+            tSignal: { get(): unknown };
+        };
+        expect(LangsysApp.t).toBe(core.LangsysApp.t);
+        expect(LangsysApp.t).toBe(core.tSignal.get());
+    });
+
+    it('has a positive control: the core itself satisfies that identity', async () => {
+        // If the core stopped holding this, the assertion above would be
+        // testing the binding against an already-broken contract.
+        const core = (await import('langsys-js-typescript')) as unknown as {
+            LangsysApp: { t: unknown };
+            tSignal: { get(): unknown };
+        };
+        expect(core.LangsysApp.t).toBe(core.tSignal.get());
+    });
+
+    it('and methods ARE still bound — the two rules coexist', () => {
+        const fn = LangsysApp.detectPreferredLocale as (...a: unknown[]) => unknown;
+        expect(fn.name).toMatch(/^bound /);
+    });
+});
+
+describe('BIND-6 — the accessor/method split is real, not assumed', () => {
+    it('has a positive control: the core exposes BOTH accessors and plain methods', () => {
+        // If either list were empty, the two forwarding rules above would be
+        // asserting against nothing and would pass vacuously.
+        expect(coreAccessorNames().length).toBeGreaterThan(0);
+        expect(coreBoundableNames().length).toBeGreaterThan(0);
+    });
+
+    it('every forwarded accessor is identity-equal to the core value', () => {
+        for (const name of coreAccessorNames().filter((n) => !INTENTIONAL_OVERRIDES.has(n))) {
+            const mine = (LangsysApp as unknown as Record<string, unknown>)[name];
+            const theirs = (coreLangsysApp as unknown as Record<string, unknown>)[name];
+            expect(mine, `accessor \`${name}\` was wrapped instead of forwarded`).toBe(theirs);
+        }
     });
 });

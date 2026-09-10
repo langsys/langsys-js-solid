@@ -220,6 +220,15 @@ const overrides = {
  */
 const boundCache = new Map<PropertyKey, { source: unknown; bound: unknown }>();
 
+/** Find a property's descriptor anywhere on the prototype chain. */
+function descriptorOf(target: object, prop: PropertyKey): PropertyDescriptor | undefined {
+    for (let o: object | null = target; o; o = Object.getPrototypeOf(o) as object | null) {
+        const d = Object.getOwnPropertyDescriptor(o, prop);
+        if (d) return d;
+    }
+    return undefined;
+}
+
 const forwardingHandler: ProxyHandler<typeof _LangsysApp> = {
     get(target, prop) {
         // `hasOwnProperty`, not `prop in overrides`: `in` walks the prototype
@@ -230,6 +239,16 @@ const forwardingHandler: ProxyHandler<typeof _LangsysApp> = {
         }
         const value = Reflect.get(target, prop, target);
         if (typeof value !== 'function') return value;
+
+        // **Bind METHODS only — never an accessor's computed value.**
+        // `LangsysApp.t` is a getter returning the live `TFunction`, and that
+        // closure's *identity* is the core's reactivity contract (pinned core-side
+        // at `cd07df1`): fresh per catalog change, stable between changes. Binding
+        // it would wrap a new function on every read, so `LangsysApp.t === tSignal.get()`
+        // stops holding while re-rendering still appears to work — a silent failure,
+        // and precisely the contract this binding's own canary test guards.
+        // A method is a data property holding a function; an accessor has a getter.
+        if (descriptorOf(target, prop)?.get) return value;
 
         const cached = boundCache.get(prop);
         if (cached && cached.source === value) return cached.bound;

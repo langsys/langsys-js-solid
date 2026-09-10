@@ -174,45 +174,74 @@ const overrides = {
  *
  * ## Why a proxy and not a wrapper class
  * This was a hand-written class enumerating one delegating method per core
- * method. That shape has a failure mode with no symptom: **every method the
+ * method. That shape has a failure mode with no symptom: **a public method the
  * core adds after the class is written silently disappears from this binding**,
  * with a green typecheck and a green suite, because nothing references what is
  * missing.
  *
- * It had already happened six times when the 838 audit found it. `setWriteGrant`
- * — the entire write-grant surface — was simply not on the list, and neither
- * were `applyAuthorization`, `getUserLanguagePreferences`,
- * `parseAcceptLanguageHeader`, `findBestLocaleMatch` and `resolveLocale`.
- * Adding `setWriteGrant` to the list would have fixed the symptom and left the
- * mechanism running for the next core release to trip over.
+ * **Correction (2026-09-09).** An earlier version of this note claimed that had
+ * "already happened six times", naming `applyAuthorization`,
+ * `getUserLanguagePreferences`, `parseAcceptLanguageHeader`,
+ * `findBestLocaleMatch` and `resolveLocale` alongside `setWriteGrant`. That was
+ * wrong, and wrong in a way worth recording. Those five are declared `private`
+ * in the core (`langsys-app.ts:84/494/513/537/567`) and appear in no `.d.ts` at
+ * all — they were never API. TypeScript's `private` is erased at runtime, so
+ * the `getOwnPropertyNames` walk that produced the claim was reading
+ * implementation detail and could not tell it from surface. **One** public
+ * member was genuinely dropped: `setWriteGrant`.
  *
- * Forwarding by reference is what BIND-6 actually asks for — "re-export by
- * reference everything that does not need adapting" — and it makes the binding
- * excludable from an investigation in one sentence: everything but `init` and
- * `setWriteGrant` *is* the core, not a copy of it. `src/surface.test.ts` guards
- * the structure rather than any method name, so a future core addition cannot
- * go missing quietly again.
+ * The mechanism is still real and the fix still right — it is simply
+ * forward-looking rather than a defect that had already fired five extra times.
+ * A public member the core adds tomorrow is exposed here automatically; the
+ * enumerated version would have omitted it silently with nothing failing.
  *
- * Forwarded members are returned **unbound**, so `LangsysApp.foo` and the
- * core's `foo` are the same function object. Calling through the proxy sets
- * `this` to the proxy, whose every read forwards to the core singleton, so the
- * method sees the core's state either way. Binding instead would make a
- * destructured method keep working here while the identical destructure off
- * the core singleton breaks — a behaviour difference, which is precisely what
- * BIND-1 forbids a binding from introducing. Own properties (`Translations`,
- * `debug`, `config`, …) pass straight through.
+ * Forwarding is what BIND-6 asks for — "re-export by reference everything that
+ * does not need adapting" — and it makes the binding excludable from an
+ * investigation in one sentence: everything but `init` and `setWriteGrant`
+ * delegates to the core rather than reimplementing it. `src/surface.test.ts`
+ * guards the structure rather than any method name.
  *
- * Safe because the core class uses no `#private` fields; those cannot be read
- * through a proxy receiver and would force binding (and with it that
- * divergence). `src/surface.test.ts` asserts the identity, so this stops being
- * true loudly rather than silently.
+ * **Forwarding rules that matter:**
+ *
+ * - `Reflect.get(target, prop, target)` — the receiver is the **core**, never
+ *   the proxy, so getters resolve against the real instance and any future
+ *   `#private` field keeps working. Passing the proxy as receiver is the
+ *   standard way this breaks.
+ * - Functions are **bound to the core** before being handed out, so a
+ *   destructured `const { refresh } = LangsysApp` still works. This was
+ *   measured, not assumed: unbound, `const { detectPreferredLocale } =
+ *   LangsysApp` throws `Cannot read properties of undefined`, because the call
+ *   site loses `this`.
+ * - Bound functions are **cached per property**, so `LangsysApp.refresh ===
+ *   LangsysApp.refresh`. Binding on every read mints a new function each time,
+ *   which silently breaks anything comparing function identity — a dependency
+ *   array, a removeEventListener, a memo key. The cache is invalidated if the
+ *   underlying core function is ever replaced.
  */
-export const LangsysApp: LangsysAppSolid = new Proxy(_LangsysApp, {
+const boundCache = new Map<PropertyKey, { source: unknown; bound: unknown }>();
+
+const forwardingHandler: ProxyHandler<typeof _LangsysApp> = {
     get(target, prop) {
+        // `hasOwnProperty`, not `prop in overrides`: `in` walks the prototype
+        // chain, so `constructor` and `__proto__` would resolve against
+        // Object.prototype and be reported as overrides of ours.
         if (Object.prototype.hasOwnProperty.call(overrides, prop)) {
             return overrides[prop as keyof typeof overrides];
         }
-        // `target` as the receiver, so getters read the core's own state.
-        return Reflect.get(target, prop, target);
+        const value = Reflect.get(target, prop, target);
+        if (typeof value !== 'function') return value;
+
+        const cached = boundCache.get(prop);
+        if (cached && cached.source === value) return cached.bound;
+
+        const bound = (value as (...args: unknown[]) => unknown).bind(target);
+        boundCache.set(prop, { source: value, bound });
+        return bound;
     },
-}) as unknown as LangsysAppSolid;
+    has(target, prop) {
+        if (Object.prototype.hasOwnProperty.call(overrides, prop)) return true;
+        return Reflect.has(target, prop);
+    },
+};
+
+export const LangsysApp: LangsysAppSolid = new Proxy(_LangsysApp, forwardingHandler) as unknown as LangsysAppSolid;

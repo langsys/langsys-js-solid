@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -88,7 +88,21 @@ function typecheck(fixture: string): { status: number; output: string } {
     return out;
 }
 
+/**
+ * Each `tsc` spawn takes 3-7s, and it grows with the core's `.d.ts`. Running
+ * it inside a test body put it against vitest's 5000ms default, so the suite
+ * went red on a slower run with nothing wrong in the types — a timeout
+ * reported as a failure. Both fixtures now compile once, up front, under a
+ * hook timeout sized for the work; the assertions read the results.
+ */
+const TSC_BUDGET_MS = 120_000;
+
 describe('BIND-6 — the exported type refuses core-private members', () => {
+    beforeAll(() => {
+        typecheck('public-member.probe.ts');
+        typecheck('private-member.probe.ts');
+    }, TSC_BUDGET_MS);
+
     it('POSITIVE CONTROL: public members compile clean (exit 0)', () => {
         const { status, output } = typecheck('public-member.probe.ts');
         expect(status, `public probe should compile; tsc said:\n${output}`).toBe(0);

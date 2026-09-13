@@ -18,11 +18,12 @@ import { createRequire } from 'node:module';
  * signature of an unpublished dependency, and it is worth exactly one test to
  * turn that into a red build instead.
  *
- * Sharper here than in the sibling bindings: this package still declares
- * `langsys-js-typescript@^0.4.1`, a range that excludes 0.6.5 in **either** of
- * its forms. The release wave owns that floor (Reviewer, `838-intake-solid`),
- * so until it moves, the symlink is the only thing putting the 838 surface on
- * the bench and this test is the only thing that notices when it goes.
+ * The declared range is `^0.6.5`, the core version this binding is built
+ * against. That range still resolves the REGISTRY 0.6.5, which lacks the 838
+ * surface, so `npm ci` still swaps the bench for the wrong artifact; the range
+ * must move to whatever core version ships in the release wave. Until then the
+ * symlink is the only thing putting the 838 surface on the bench, and this test
+ * is the only thing that notices when it goes.
  *
  * ## What it asserts
  * The symbols are probed **by identity, never by version string**, against the

@@ -150,6 +150,21 @@ describe('BIND-6 — the binding forwards the core surface', () => {
     });
 });
 
+describe('WIRE-5 — a test double is reachable without editing the artifact', () => {
+    it('re-exports LangsysAppAPI with setBaseUrl, so an integrator can point the SDK at a double', async () => {
+        const surface = (await import('./index.js')) as Record<string, unknown>;
+        const api = surface.LangsysAppAPI as { setBaseUrl?: unknown } | undefined;
+        expect(typeof api?.setBaseUrl).toBe('function');
+    });
+
+    it('POSITIVE CONTROL: the core exposes the same entry point', async () => {
+        // Without this, the assertion above could pass against a core that had
+        // renamed the method, in which case nothing here would be reachable.
+        const core = (await import('langsys-js-typescript')) as Record<string, unknown>;
+        expect(typeof (core.LangsysAppAPI as { setBaseUrl?: unknown }).setBaseUrl).toBe('function');
+    });
+});
+
 describe('BIND-6 — destructuring survives, and that is measured', () => {
     /**
      * The shape before this branch was a wrapper class, whose own methods closed

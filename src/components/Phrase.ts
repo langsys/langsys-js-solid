@@ -1,7 +1,8 @@
 import { children as resolveChildren, createEffect, onCleanup, onMount, untrack } from 'solid-js';
 import type { JSX } from 'solid-js';
 import { PHRASE_MARKER_ATTR, Phrase as VanillaPhrase, type ParamPrimitive } from 'langsys-js-typescript';
-import { appendResolved } from './host.js';
+import { isServer } from 'solid-js/web';
+import { appendResolved, serverHost } from './host.js';
 
 /**
  * Props for the Solid `Phrase` component. Mirrors the React/Vue/Svelte
@@ -36,13 +37,22 @@ export interface PhraseProps {
  *
  * Keep children static (literal markup): the handler takes over the rendered
  * subtree. For values Solid owns and re-renders, pass them through `params`.
- * Client-only: on the server, render plain markup and hydrate.
+ * Under a server render it emits its marked tag and children untranslated
+ * (see `serverHost`); translating that markup after hydration is unproven.
  */
 export function Phrase(props: PhraseProps): JSX.Element {
+    // No `document` under a server render: emit the untranslated, marked markup instead of throwing.
+    if (isServer) {
+        return serverHost(props.tag ?? 'span', { class: props.class, [PHRASE_MARKER_ATTR]: '' }, () => props.children);
+    }
+
     const host = document.createElement(props.tag ?? 'span');
     host.setAttribute(PHRASE_MARKER_ATTR, '');
     if (props.class) host.className = props.class;
-    appendResolved(host, resolveChildren(() => props.children));
+    appendResolved(
+        host,
+        resolveChildren(() => props.children)
+    );
 
     let instance: VanillaPhrase | undefined;
 

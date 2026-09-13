@@ -1,6 +1,7 @@
 import { children as resolveChildren } from 'solid-js';
 import type { JSX } from 'solid-js';
-import { appendResolved } from './host.js';
+import { isServer } from 'solid-js/web';
+import { appendResolved, serverHost } from './host.js';
 
 /**
  * Props for the Solid `DontTranslate` component. Mirrors the React/Vue/Svelte
@@ -26,11 +27,23 @@ export interface DontTranslateProps {
  * vanilla handler needed.
  */
 export function DontTranslate(props: DontTranslateProps): JSX.Element {
+    // No `document` under a server render: emit the same excluded markup instead of throwing.
+    if (isServer) {
+        return serverHost(
+            props.tag ?? 'span',
+            { class: props.class, translate: 'no', 'data-ls-dont-translate': '' },
+            () => props.children
+        );
+    }
+
     const host = document.createElement(props.tag ?? 'span');
     host.setAttribute('translate', 'no');
     host.setAttribute('data-ls-dont-translate', '');
     if (props.class) host.className = props.class;
-    appendResolved(host, resolveChildren(() => props.children));
+    appendResolved(
+        host,
+        resolveChildren(() => props.children)
+    );
     return host;
 }
 

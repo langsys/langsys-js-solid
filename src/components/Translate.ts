@@ -1,7 +1,8 @@
 import { children as resolveChildren, createEffect, onCleanup, onMount, untrack } from 'solid-js';
 import type { JSX } from 'solid-js';
 import { Translate as VanillaTranslate, type ParamPrimitive } from 'langsys-js-typescript';
-import { appendResolved } from './host.js';
+import { isServer } from 'solid-js/web';
+import { appendResolved, serverHost } from './host.js';
 
 /**
  * Props for the Solid `Translate` component. Mirrors the React/Vue/Svelte
@@ -42,12 +43,19 @@ export interface TranslateProps {
  * The SDK mutates the rendered DOM in place, so keep the children static:
  * prose, marketing copy, CMS-rendered HTML — the content-block use case. For
  * dynamic per-string values that Solid owns and re-renders, use `useT()`
- * instead. Client-only: on the server, render plain markup and hydrate.
+ * instead. Under a server render it emits its tag and children untranslated
+ * (see `serverHost`); translating that markup after hydration is unproven.
  */
 export function Translate(props: TranslateProps): JSX.Element {
+    // No `document` under a server render: emit the untranslated markup instead of throwing.
+    if (isServer) return serverHost(props.tag ?? 'translate', { class: props.class }, () => props.children);
+
     const host = document.createElement(props.tag ?? 'translate');
     if (props.class) host.className = props.class;
-    appendResolved(host, resolveChildren(() => props.children));
+    appendResolved(
+        host,
+        resolveChildren(() => props.children)
+    );
 
     let instance: VanillaTranslate | undefined;
 

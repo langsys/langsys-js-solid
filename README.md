@@ -87,8 +87,10 @@ import { DontTranslate, Phrase, Translate } from 'langsys-js-solid';
 
 Keep `<Translate>`/`<Phrase>` children static — the SDK mutates the rendered
 DOM in place. For values Solid owns and re-renders, use `useT()` or pass them
-through `params`. The components build real DOM nodes, so they're client-only;
-on the server render plain markup and hydrate.
+through `params`. The components build real DOM nodes in the browser. Under a server render they
+emit their tag and children untranslated, so a server-rendered page falls back to
+the base language instead of failing; translating that markup after hydration is
+not yet proven.
 
 ## Reactive primitives
 

@@ -18,7 +18,8 @@
  *     Svelte's `writable`); `solidToLocaleSource` — adapt an existing signal;
  *     `adaptWriteGrant` — resolve a Solid accessor as a write grant per call.
  *   - `Translate` / `Phrase` / `DontTranslate` — components wrapping the
- *     vanilla DOM handlers. Client-only (they build real DOM nodes).
+ *     vanilla DOM handlers. They build real DOM nodes in the browser and emit
+ *     untranslated markup under a server render.
  *   - Raw signals `t` / `currentlyLoadedLocale` / `sTranslations` — re-exported
  *     for advanced/direct subscription outside Solid's reactivity (they also
  *     work with Solid's own `from()`).

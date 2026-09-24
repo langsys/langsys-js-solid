@@ -7,14 +7,9 @@ import { Translate } from './components/Translate.js';
 /**
  * The components must not crash a server render.
  *
- * Measured before this guard existed: rendered under Solid's server build,
- * `<Translate>`, `<Phrase>` and `<DontTranslate>` all threw
- * `ReferenceError: document is not defined`, because each built its host with
- * `document.createElement`. A SolidStart page using any of them failed its whole
- * server response.
- *
- * Under a server render they now emit their tag, attributes and children,
- * untranslated. That is lifecycle adaptation (BIND-1) and nothing more. It does
+ * Each component builds its host with `document.createElement` in the browser. A server render
+ * has no `document`, so there they emit their tag, attributes and children, untranslated, and a
+ * page using them renders in the base language. That is lifecycle adaptation (BIND-1) and nothing more. It does
  * NOT satisfy SRV-1..5: the served HTML is still the base language, nothing here
  * captures children or scopes a catalog to the request, and whether the client
  * hydrates cleanly against this markup is unproven (SRV-4).

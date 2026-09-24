@@ -89,11 +89,9 @@ function typecheck(fixture: string): { status: number; output: string } {
 }
 
 /**
- * Each `tsc` spawn takes 3-7s, and it grows with the core's `.d.ts`. Running
- * it inside a test body put it against vitest's 5000ms default, so the suite
- * went red on a slower run with nothing wrong in the types — a timeout
- * reported as a failure. Both fixtures now compile once, up front, under a
- * hook timeout sized for the work; the assertions read the results.
+ * Each `tsc` spawn takes seconds and grows with the core's `.d.ts`, beyond vitest's 5000ms test
+ * default. Both fixtures compile once, up front, under a hook timeout sized for the work; the
+ * assertions read the results.
  */
 const TSC_BUDGET_MS = 120_000;
 

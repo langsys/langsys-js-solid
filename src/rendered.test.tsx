@@ -16,14 +16,7 @@ import { useT, useWriteEnabled } from './primitives.js';
  * different facts.
  *
  * ## Why this file exists
- * The Angular lane shipped a capability signal that held the right value while
- * the framework never repainted: `afterNextRender` ran outside the zone, so no
- * change detection was scheduled. Their entire suite read the signal directly,
- * so nothing could see it. The bug was invisible by construction, not by
- * oversight (Reviewer, `838-intake-solid`).
- *
- * Solid has no zone and no change detection, so that exact failure cannot
- * occur here — but the equivalent one can, from the other side: this binding's
+ * A value can be correct in its accessor and still never reach the screen. This binding's
  * updates arrive from **outside Solid's ownership**, in a base-SDK `subscribe`
  * callback, and pass through **two `===` equality gates** (the core's
  * `Object.is` guard and Solid's own `createSignal` default) before reaching a
@@ -105,9 +98,8 @@ describe('useWriteEnabled — through a rendered template', () => {
     });
 
     it('repaints from a core emit that originates outside Solid ownership', async () => {
-        // The core's subscribe callback fires from plain (non-Solid) code. This
-        // is the path Angular's bug lived on: value arrives, framework never
-        // notices. Asserted at the DOM.
+        // The core's subscribe callback fires from plain (non-Solid) code, where a value can
+        // arrive without the framework noticing. Asserted at the DOM.
         writeEnabled.set(false);
         const view = mount(() => {
             const enabled = useWriteEnabled();
@@ -142,15 +134,9 @@ describe('useT — through a rendered template', () => {
 
     it('repaints when a locale switch lands its catalog — the real product path', () => {
         /**
-         * Replaces a test named "repaints on locale change alone", which was a
-         * tautology: `t()` resolves against `sTranslations`, not against the
-         * locale, so a locale change on its own re-mints the `TFunction`
-         * identity while rendering byte-identical text. Both of its assertions
-         * held whether or not propagation worked — it stayed green under a
-         * kill-propagation mutation that reddened the catalog test beside it.
-         *
-         * This asserts the sequence that actually happens, and pins the
-         * semantics that made the old test vacuous as a fact in its own right.
+         * `t()` resolves against the catalog, not the locale: a locale change on its own re-mints
+         * `t` and renders the same text. The repaint that matters is the catalog landing after the
+         * locale flips, so that is the sequence asserted.
          */
         sTranslations.set(catalog('Greeting', { Hello: 'Hello there' }));
         currentlyLoadedLocale.set('en-us');
@@ -175,8 +161,7 @@ describe('useT — through a rendered template', () => {
 
 describe('the equality gate, proven at the DOM (BIND-5)', () => {
     /**
-     * The `open` BIND-5 row measured this with `createComputed`. Re-proved here
-     * through a rendered template, because the consequence that matters is not
+     * Proved through a rendered template, because the consequence that matters is not
      * "the computation did not re-run" — it is "the user's screen froze".
      *
      * `useT()`'s correctness rests entirely on the core minting a fresh
@@ -221,8 +206,7 @@ describe('WIRE-3 — locale casing, measured against the core (not a double)', (
     /**
      * Not asserted against a hand-written double. A double encodes whatever
      * casing its author assumed, and assertions written against it then demand
-     * that form — which is how the Angular lane ended up asserting the exact
-     * casing WIRE-3 forbids. These run the real `canonicalizeLocale` from the
+     * that form, even when it is the casing WIRE-3 forbids. These run the real `canonicalizeLocale` from the
      * resolved core, side by side with what this binding does.
      */
     it('the core canonicalizes to LOWERCASE, both halves', async () => {
@@ -251,7 +235,7 @@ describe('WIRE-3 — locale casing, measured against the core (not a double)', (
         const { canonicalizeLocale } = await import('langsys-js-typescript');
         // The trap this pins: `currentlyLoadedLocale` emits the canonicalized
         // form, so a raw `=== 'en-US'` comparison never matches. Documented in
-        // createLocaleStore's docstring, which previously claimed the opposite.
+        // createLocaleStore's docstring.
         currentlyLoadedLocale.set(canonicalizeLocale('en-US'));
         expect(currentlyLoadedLocale.get()).toBe('en-us');
         expect(currentlyLoadedLocale.get()).not.toBe('en-US');

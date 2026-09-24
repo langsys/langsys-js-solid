@@ -5,32 +5,17 @@ import { LangsysApp } from './index.js';
 /**
  * BIND-6 — wrap the narrowest surface possible.
  *
- * ## The bug this test exists to prevent
- * This binding used to export a hand-written `LangsysAppSolid` class that
- * **enumerated** its delegating methods — one `public foo() { return
- * _LangsysApp.foo(); }` per core method. A public method the core added after
- * that class was written would silently vanish from the binding's surface, with
- * a green typecheck and a green suite, because nothing referenced what was
- * missing. `setWriteGrant` — the whole write-grant surface — did exactly that.
+ * The binding forwards the core singleton rather than enumerating its methods. An enumerated
+ * wrapper — one `public foo() { return _LangsysApp.foo(); }` per method — silently omits any
+ * public method the core adds later, with a green typecheck and a green suite, because nothing
+ * references what is missing. These tests guard the forwarding structure, not a method list.
  *
- * ## Correction (2026-09-09), recorded because the mistake generalises
- * An earlier version of this comment said **six** members had been dropped,
- * naming `applyAuthorization`, `getUserLanguagePreferences`,
- * `parseAcceptLanguageHeader`, `findBestLocaleMatch` and `resolveLocale`
- * alongside `setWriteGrant`. Those five are `private` in the core and reach the
- * `.d.ts` only as bare `private name;` declarations — no signature, inaccessible
- * to any caller outside the class. They were never API. The claim came from the
- * runtime prototype
- * walk below, and **TypeScript's `private` is erased at runtime** — so
- * `getOwnPropertyNames` surfaces implementation detail and cannot distinguish
- * it from public surface. The walk was right; the conclusion drawn from it was
- * not. Exactly one public member was genuinely dropped.
- *
- * The prototype walk is still the right instrument for what it actually tests —
- * *uniform forwarding*, i.e. that nothing is dropped on the way through. It is
- * simply not a statement about API. Rows generated from it that name a
- * core-private member are labelled as such below, so no reader takes them for
- * surface.
+ * The walk below reads the core's prototype at runtime. TypeScript's `private` is erased at
+ * runtime, so the walk also sees core-private members (`applyAuthorization`,
+ * `getUserLanguagePreferences`, `parseAcceptLanguageHeader`, `findBestLocaleMatch`,
+ * `resolveLocale`), which reach the `.d.ts` only as bare `private name;` declarations. They are
+ * forwarded uniformly, which is harmless; they are not API, and rows naming them are labelled as
+ * such. The exported type excludes them (`src/type-surface.test.ts`).
  */
 
 /** Members this binding deliberately overrides — narrow, each for a stated reason. */
@@ -53,11 +38,6 @@ const CORE_PRIVATE = new Set([
     'findBestLocaleMatch',
     'resolveLocale',
 ]);
-// `noticeUnusableWriteCapability` was briefly a private method here. It moved out
-// of the class at core `c1cf492` and is now a standalone exported function, so it
-// is no longer on the prototype and the walk below never sees it. Kept as a note
-// rather than a set entry: a name in `CORE_PRIVATE` that the walk cannot produce
-// is dead weight that reads as coverage.
 
 const label = (name: string) =>
     CORE_PRIVATE.has(name) ? `${name} [core-private, forwarded uniformly, not API]` : name;
@@ -132,7 +112,7 @@ describe('BIND-6 — the binding forwards the core surface', () => {
         expect(new Set(overridden)).toEqual(INTENTIONAL_OVERRIDES);
     });
 
-    it('exposes the one public member the enumerating class actually dropped', () => {
+    it('exposes setWriteGrant, the write-grant surface', () => {
         expect(typeof LangsysApp.setWriteGrant).toBe('function');
     });
 
@@ -234,7 +214,7 @@ describe('BIND-6 — accessors are forwarded UNBOUND (the identity contract)', (
      *
      * Binding it would mint a wrapper on every read. Re-rendering would still
      * *look* correct while `LangsysApp.t === tSignal.get()` quietly stopped
-     * holding — the silent shape this whole lane exists to catch. So methods
+     * holding — a failure no ordinary test notices. So methods
      * are bound and accessors are not.
      */
     it('LangsysApp.t is the core TFunction itself, not a bound wrapper', async () => {

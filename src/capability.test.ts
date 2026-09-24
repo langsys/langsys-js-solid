@@ -6,8 +6,7 @@ import { useWriteEnabled } from './primitives.js';
 /**
  * GATE-8 / BIND-1 / BIND-2 — the capability surface.
  *
- * The house principle behind all three finished relands (Reviewer,
- * `838-intake-solid`): **the first client render must agree with what the
+ * The principle: **the first client render must agree with what the
  * server rendered.** Capability reads `undefined` until the client actually
  * knows, and never seeds a concrete value the server did not render.
  *

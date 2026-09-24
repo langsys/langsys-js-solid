@@ -80,6 +80,20 @@ export { adaptWriteGrant, createLocaleStore, solidToLocaleSource, useSignal } fr
 export type { WriteGrantSource } from './adapters.js';
 export { useCurrentLocale, useLocaleStore, useT, useTranslations, useWriteEnabled } from './primitives.js';
 
+// Route changes (HINT-13): the core's entry point by reference, and a hook that times it.
+export { notifyNavigation } from 'langsys-js-typescript';
+export { useNotifyNavigation } from './navigation.js';
+
+// Server message entries (MSG-1, MSG-2, MSG-5, MSG-6): the core's API by reference, and a
+// Solid accessor over it.
+export {
+    DEFAULT_SERVER_MESSAGE_CATEGORY,
+    renderServerMessage,
+    resolveServerMessages,
+    type ServerMessage,
+} from 'langsys-js-typescript';
+export { useMessage } from './messages.js';
+
 // Components
 export { Translate, type TranslateProps } from './components/Translate.js';
 export { Phrase, type PhraseProps } from './components/Phrase.js';
@@ -176,29 +190,11 @@ const overrides = {
  * reference**.
  *
  * ## Why a proxy and not a wrapper class
- * This was a hand-written class enumerating one delegating method per core
- * method. That shape has a failure mode with no symptom: **a public method the
- * core adds after the class is written silently disappears from this binding**,
- * with a green typecheck and a green suite, because nothing references what is
- * missing.
- *
- * **Correction (2026-09-09).** An earlier version of this note claimed that had
- * "already happened six times", naming `applyAuthorization`,
- * `getUserLanguagePreferences`, `parseAcceptLanguageHeader`,
- * `findBestLocaleMatch` and `resolveLocale` alongside `setWriteGrant`. That was
- * wrong, and wrong in a way worth recording. Those five are declared `private`
- * in the core (`langsys-app.ts:84/494/513/537/567`) and reach the `.d.ts` only as
- * bare `private name;` declarations — name only, no signature — which TypeScript
- * refuses to every caller outside the class. They were never API. `private` is
- * erased at RUNTIME, however, so
- * the `getOwnPropertyNames` walk that produced the claim was reading
- * implementation detail and could not tell it from surface. **One** public
- * member was genuinely dropped: `setWriteGrant`.
- *
- * The mechanism is still real and the fix still right — it is simply
- * forward-looking rather than a defect that had already fired five extra times.
- * A public member the core adds tomorrow is exposed here automatically; the
- * enumerated version would have omitted it silently with nothing failing.
+ * An enumerated wrapper — one delegating method per core method — silently omits any public
+ * method the core adds later, with a green typecheck and a green suite, because nothing
+ * references what is missing. Forwarding exposes every public core member, present and future.
+ * TypeScript's `private` is erased at runtime, so core-private members are forwarded too; the
+ * exported type (`LangsysAppSolid`) excludes them.
  *
  * Forwarding is what BIND-6 asks for — "re-export by reference everything that
  * does not need adapting" — and it makes the binding excludable from an

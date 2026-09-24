@@ -48,6 +48,7 @@ const REQUIRED_838_SYMBOLS = {
     writeEnabled: 'object', // a Signal instance, not a function
     setWriteGrant: 'function',
     autoDiscovery: 'object', // a controller object, not a function
+    notifyNavigation: 'function', // HINT-13's entry point, which `useNotifyNavigation` calls
 } as const;
 
 /** Present in BOTH the published and local builds — proves the import resolved. */

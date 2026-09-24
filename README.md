@@ -162,6 +162,45 @@ If the token only exists after login, still configure the provider at `init`
 grant tells the SDK no grant can ever arrive. To supply one later, `await
 LangsysApp.setWriteGrant(grant)`, which re-authorizes rather than just storing it.
 
+## Route changes
+
+A layout or header that stays mounted across a navigation does not re-render when only the route
+changes, so its missing phrases would never be reported for the new page. Tell the SDK the route
+changed; with `@solidjs/router`:
+
+```tsx
+import { useLocation } from '@solidjs/router';
+import { useNotifyNavigation } from 'langsys-js-solid';
+
+function Layout(props) {
+    const location = useLocation();
+    useNotifyNavigation(() => location.pathname + location.search + location.hash);
+    return <>{props.children}</>;
+}
+```
+
+On any other router, call `notifyNavigation()` from its after-navigation hook.
+
+## Server messages
+
+Validation and error messages from a Langsys server SDK arrive as entries —
+`{ field?, code, message, template, params? }`. Render them with `useMessage`: the template is
+looked up under the messages category (`messagesCategory` at `init`, default `Errors`) and filled
+with its params, so plurals come from the catalog's ICU. When the catalog has no translation for
+it, the server's `message` is shown instead. `resolveServerMessages` turns a response body into
+entries, and `renderServerMessage` renders one outside a component.
+
+```tsx
+import { useMessage } from 'langsys-js-solid';
+
+function FieldError(props: { entry: ServerMessage }) {
+    const text = useMessage(() => props.entry);
+    return <p class="error">{text()}</p>;
+}
+```
+
+`code` is for your logic — which field to highlight, whether to retry — never for choosing text.
+
 ## Playground
 
 `example/` is a runnable playground (`npm run dev`) mirroring the

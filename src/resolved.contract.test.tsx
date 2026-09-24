@@ -5,12 +5,16 @@ import { currentlyLoadedLocale } from 'langsys-js-typescript';
 import { LangsysApp, createLocaleStore } from './index.js';
 import { Phrase } from './components/Phrase.js';
 import { Translate } from './components/Translate.js';
+import { useT } from './primitives.js';
 import { setPage, startContractFixture, until, type ContractFixture } from '../test-support/contract.js';
 
 /**
  * GATE-10 against the contract double (CONF-2, tier `contract`): a subtree marked
  * `data-ls-resolved` is already-resolved output, not source, and nothing inside it is recorded
  * as a miss.
+ *
+ * Only DOM hosts read the marker. A bare `t()` call is outside the rule: it records its miss even
+ * under a resolved ancestor, which is this file's negative control.
  *
  * The reading is the core's; this binding's part is handing the core the host element it
  * renders, attached to the document, so the core can walk to a marked ancestor. Every case
@@ -97,11 +101,22 @@ describe('GATE-10: a resolved ancestor suppresses misses on both render paths', 
             </div>
         ));
 
+        // NEGATIVE CONTROL: a bare t() under a resolved ancestor is not a DOM host, so it records.
+        mountIn({ 'data-ls-resolved': 'es-es' }, () => {
+            const t = useT();
+            return <span>{t()('Bare t under a resolved ancestor', 'UI')}</span>;
+        });
+
         // What registered, on either path: a content block's phrases, or a flat phrase.
         const registered = async () => [...(await blockPhrases()), ...(await phrases())];
         await until(async () => {
             const r = await registered();
-            return r.includes('Block unmarked') && r.includes('Block opted out') && r.includes('Leaf unmarked');
+            return (
+                r.includes('Block unmarked') &&
+                r.includes('Block opted out') &&
+                r.includes('Leaf unmarked') &&
+                r.includes('Bare t under a resolved ancestor')
+            );
         });
         // The block path really ran as a content block, not as a one-token phrase (TOK-6).
         expect(await blockPhrases()).toContain('Block unmarked');

@@ -201,6 +201,45 @@ function FieldError(props: { entry: ServerMessage }) {
 
 `code` is for your logic — which field to highlight, whether to retry — never for choosing text.
 
+## Migrating from key-based i18n
+
+An app moving from vue-i18n, i18next or plain JSON files can keep its source-language files and
+adopt Langsys one call at a time. Pass them to `init` as `legacyKeys`; the binding hands them to the
+core unchanged.
+
+```ts
+import en from './locales/en.json';
+
+await LangsysApp.init({
+    projectid,
+    key,
+    UserLocaleStore,
+    legacyKeys: [{ name: 'locales/en.json', format: 'vue-i18n', data: en }],
+});
+```
+
+`t()` from `useT()` then resolves its argument as a key first: `t()('checkout.submit')` shows and
+registers the key's value, "Pay now", under the category `checkout`, and the key string never
+reaches Langsys. An argument that is not a key is source text, as always. Placeholders and plurals
+are converted to Langsys syntax as the files are read. A file in a format the core does not read
+makes `init` reject with `LegacyFormatError` (from `langsys-js-typescript`), naming the file. Remove
+`legacyKeys` once the migration is done.
+
+## Catalog snapshots
+
+A snapshot is an exported catalog file. Load it before the first render and translations show with
+no network call:
+
+```ts
+import snapshot from './langsys-snapshot.json';
+
+LangsysApp.loadSnapshot(snapshot); // the user's locale, or pass one as the second argument
+```
+
+Mounted `useT()` consumers repaint on the same tick. The snapshot is a cache: `init()` still fetches
+the catalog, which replaces it. An edited snapshot is refused with a `SnapshotError`; export it
+again rather than editing it.
+
 ## Playground
 
 `example/` is a runnable playground (`npm run dev`) mirroring the

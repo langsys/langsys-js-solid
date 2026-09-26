@@ -31,11 +31,6 @@ const legacyKeys: LegacyKeyFile[] = [
 
 let fx: ContractFixture;
 const disposers: Array<() => void> = [];
-/**
- * `t()`'s type reads the params a call may pass from the placeholders in its first argument. A key
- * has none, so a keyed call with params is typed through this plain signature.
- */
-const keyed = (t: unknown) => t as (key: string, params?: Record<string, unknown>) => string;
 const phrases = async () => (await fx.state()).projects.p1.phrases;
 
 beforeAll(async () => {
@@ -85,8 +80,8 @@ describe('MIG: the binding hands legacyKeys to the core untouched', () => {
                 return (
                     <p>
                         <span>{t()('checkout.submit')}</span>
-                        <span>{keyed(t())('checkout.greet', { name: 'Ana' })}</span>
-                        <span>{keyed(t())('checkout.items', { count: 2 })}</span>
+                        <span>{t()('checkout.greet', { name: 'Ana' })}</span>
+                        <span>{t()('checkout.items', { count: 2 })}</span>
                         <span>{t()('Welcome back!', 'UI')}</span>
                     </p>
                 );

@@ -7,8 +7,8 @@ import { useT } from './primitives.js';
  *
  * What is shown is the core's decision (MSG-5): `renderServerMessage` renders the entry's
  * template through `t()` under the messages category when the catalog holds it, and otherwise
- * shows the entry's `message`; `message` is never used as a lookup key and `code` never chooses
- * text. This wrapper only adds timing: reading `t` makes the accessor depend on the catalog and
+ * shows the entry's `message`, as it does for an entry with no template; `message` is never used
+ * as a lookup key and `code` never chooses text. This wrapper only adds timing: reading `t` makes the accessor depend on the catalog and
  * locale, so it repaints when either changes.
  *
  * `category` overrides the category configured at `init` (`messagesCategory`, default `Errors`)

@@ -3,21 +3,28 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRoot } from 'solid-js';
 import { render } from 'solid-js/web';
-import { currentlyLoadedLocale, sTranslations, type ServerMessage, type iCategories } from 'langsys-js-typescript';
-import { LangsysApp } from './index.js';
+import { currentlyLoadedLocale, sTranslations, type iCategories } from 'langsys-js-typescript';
+import { LangsysApp, resolveServerMessages, type ServerMessage } from './index.js';
 import { useMessage } from './messages.js';
 
 /**
- * MSG-5's client half, rowed against the shared rendering vectors
- * (`test-support/fixtures/server-message-vectors.json`, blob `c8125549cfee0f5286f79a8cbc194cd30ccd446e`,
- * authored by the JS core against spec blob `286dcfe4`).
+ * Server messages against the shared vectors (`test-support/fixtures/server-message-vectors.json`,
+ * blob `7333e3919dac43af81c6c20bfdba974efd79725b`, authored by the JS core against spec blob
+ * `5d7e6890`, from real framework messages).
  *
- * The rendering decision — the template through `t()` when the catalog holds it, otherwise the
- * entry's `message`, never `message` as a key, never `code` choosing text — is the core's
- * `renderServerMessage`. This binding's part is `useMessage`, a Solid accessor over it. Every
- * render vector goes through that accessor, and a rendered component shows it repaints when the
- * catalog changes. In-process rendering, so the tier is `n/a (pure)`.
+ * Resolving entries out of a framework's error body (MSG-1) and deciding what to show (MSG-5) are
+ * the core's `resolveServerMessages` and `renderServerMessage`, which this binding re-exports by
+ * reference. The binding's part is `useMessage`, a Solid accessor over the render. Every render
+ * vector goes through that accessor; the canonical entries, attached to two frameworks' own error
+ * bodies and resolved through the key the app configures, render identically through it; and a
+ * rendered component shows it repaints when the catalog changes. In-process, so the tier is
+ * `n/a (pure)`.
  */
+
+interface CanonicalEntry extends ServerMessage {
+    framework: string;
+    source: string;
+}
 
 interface RenderVector {
     id: string;
@@ -30,7 +37,7 @@ interface RenderVector {
 
 const vectors = JSON.parse(
     readFileSync(join(process.cwd(), 'test-support', 'fixtures', 'server-message-vectors.json'), 'utf8')
-) as { spec_blob: string; render: RenderVector[] };
+) as { spec_blob: string; canonical_entries: CanonicalEntry[]; render: RenderVector[] };
 
 const uncategorized = { __category__: '__uncategorized__', __symbol__: '__uncategorized__' };
 
@@ -50,7 +57,7 @@ function publish(catalog: RenderVector['catalog'], locale: string): void {
 
 describe('MSG-5: every shared rendering vector, through useMessage', () => {
     it('reads the vector file this row cites', () => {
-        expect(vectors.spec_blob).toContain('286dcfe429c8a0cdac60cdd6ab062bdf671ad078');
+        expect(vectors.spec_blob).toContain('5d7e6890b733a50fb6f5f5c30e0056c6ef7bcf45');
         expect(vectors.render.length).toBeGreaterThan(0);
     });
 
@@ -61,6 +68,49 @@ describe('MSG-5: every shared rendering vector, through useMessage', () => {
             expect(text()).toBe(vector.expected);
             dispose();
         });
+    });
+});
+
+describe("MSG-1: entries resolve from the framework's own body through configuration", () => {
+    const entries = vectors.canonical_entries.map(({ framework: _f, source: _s, ...entry }) => entry);
+    const laravel = () => ({
+        message: 'The given data was invalid.',
+        errors: { password: ['…'] },
+        langsys_errors: entries,
+    });
+    const fastapi = () => ({
+        detail: [{ type: 'missing', loc: ['body', 'email'], msg: 'Field required' }],
+        meta: { errors: entries },
+    });
+
+    it("the canonical entries render identically from two frameworks' bodies, which stay unchanged", () => {
+        const catalog: Record<string, string> = {};
+        for (const [i, entry] of entries.entries())
+            if (entry.template && i % 2 === 0) catalog[entry.template] = `ES ${i}`;
+        publish({ Errors: catalog }, 'es');
+
+        const fromLaravel = laravel();
+        const fromFastapi = fastapi();
+        const a = resolveServerMessages(fromLaravel, { key: 'langsys_errors' });
+        const b = resolveServerMessages(fromFastapi, { key: 'meta.errors' });
+        expect(a).toEqual(entries);
+        expect(b).toEqual(entries);
+        expect(fromLaravel).toEqual(laravel());
+        expect(fromFastapi).toEqual(fastapi());
+
+        createRoot((dispose) => {
+            const shown = (list: ServerMessage[]) => list.map((entry) => useMessage(() => entry)());
+            const expected = entries.map((entry, i) =>
+                entry.template && i % 2 === 0 ? `ES ${i}` : (entry.message ?? '')
+            );
+            expect(shown(a)).toEqual(expected);
+            expect(shown(b)).toEqual(expected);
+            dispose();
+        });
+    });
+
+    it('resolves nothing without being told where the entries sit', () => {
+        expect(() => resolveServerMessages(laravel(), {} as never)).toThrow(TypeError);
     });
 });
 
@@ -81,7 +131,7 @@ describe('useMessage repaints with the catalog', () => {
         }, el);
         expect(el.textContent).toBe(entry.message);
 
-        publish({ Errors: { [entry.template]: 'La confirmación de la contraseña no coincide.' } }, 'es');
+        publish({ Errors: { [entry.template!]: 'La confirmación de la contraseña no coincide.' } }, 'es');
         expect(el.textContent).toBe('La confirmación de la contraseña no coincide.');
 
         dispose();

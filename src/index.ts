@@ -90,7 +90,9 @@ export {
     DEFAULT_SERVER_MESSAGE_CATEGORY,
     renderServerMessage,
     resolveServerMessages,
+    type ResolveServerMessagesOptions,
     type ServerMessage,
+    type ServerMessagePieces,
 } from 'langsys-js-typescript';
 export { useMessage } from './messages.js';
 

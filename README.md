@@ -183,15 +183,22 @@ On any other router, call `notifyNavigation()` from its after-navigation hook.
 
 ## Server messages
 
-Validation and error messages from a Langsys server SDK arrive as entries —
-`{ field?, code, message, template, params? }`. Render them with `useMessage`: the template is
-looked up under the messages category (`messagesCategory` at `init`, default `Errors`) and filled
-with its params, so plurals come from the catalog's ICU. When the catalog has no translation for
-it, the server's `message` is shown instead. `resolveServerMessages` turns a response body into
-entries, and `renderServerMessage` renders one outside a component.
+A Langsys server SDK attaches translatable entries to your framework's own error response, beside
+what the framework already sends (for Laravel, next to `errors` in its 422 body). Each entry is
+`{ template, params?, message?, field?, code? }`: the framework's sentence unfilled, the values that
+fill it, the filled text as a fallback, and the framework's own field path and failure identifier,
+unchanged.
+
+Tell `resolveServerMessages` where the entries sit, with the key your server attaches them under or a
+`resolver` of your own; it never searches the body by shape. Render each with `useMessage`: the
+template is looked up under the messages category (`messagesCategory` at `init`, default `Errors`)
+and filled with its params, so plurals come from the catalog's ICU. When the catalog has no
+translation for it, or the entry has no template, the entry's `message` is shown.
 
 ```tsx
-import { useMessage } from 'langsys-js-solid';
+import { resolveServerMessages, useMessage, type ServerMessage } from 'langsys-js-solid';
+
+const entries = resolveServerMessages(await res.json(), { key: 'langsys_errors' });
 
 function FieldError(props: { entry: ServerMessage }) {
     const text = useMessage(() => props.entry);
@@ -199,7 +206,8 @@ function FieldError(props: { entry: ServerMessage }) {
 }
 ```
 
-`code` is for your logic — which field to highlight, whether to retry — never for choosing text.
+`code` is your framework's own identifier, for your logic — which field to highlight, whether to
+retry — never for choosing text. `renderServerMessage` renders one entry outside a component.
 
 ## Migrating from key-based i18n
 

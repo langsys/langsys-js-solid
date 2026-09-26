@@ -23,6 +23,11 @@
             "types": "./dist/index.d.ts",
             "import": "./dist/index.mjs",
             "require": "./dist/index.js"
+        },
+        "./start": {
+            "types": "./dist/start.d.ts",
+            "import": "./dist/start.mjs",
+            "require": "./dist/start.js"
         }
     },
     "files": [

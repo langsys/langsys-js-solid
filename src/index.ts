@@ -96,6 +96,16 @@ export {
 } from 'langsys-js-typescript';
 export { useMessage } from './messages.js';
 
+// The server-render hand-off (SRV-4, SRV-7): the seed a request scope rendered with, written into
+// the page on the server and seeded on the client before hydration.
+export { LangsysSeed, SEED_ELEMENT_ID, seedFromDocument } from './seed.js';
+export {
+    createRequestScope,
+    currentRequestScope,
+    type RequestScope,
+    type RequestScopeOptions,
+} from 'langsys-js-typescript';
+
 // Components
 export { Translate, type TranslateProps } from './components/Translate.js';
 export { Phrase, type PhraseProps } from './components/Phrase.js';

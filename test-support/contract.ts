@@ -69,7 +69,7 @@ export async function startContractFixture(): Promise<ContractFixture> {
     });
 
     const origin = new URL(ready.base_url).origin;
-    setPage(origin + '/');
+    if (typeof window !== 'undefined') setPage(origin + '/');
 
     return {
         baseUrl: ready.base_url,

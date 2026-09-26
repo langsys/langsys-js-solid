@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-    entry: ['src/index.ts'],
+    entry: ['src/index.ts', 'src/start.ts'],
     format: ['esm', 'cjs'],
     dts: true,
     sourcemap: true,
@@ -11,5 +11,5 @@ export default defineConfig({
     splitting: false,
     minify: false,
     // Solid is provided by the consuming app — never bundle it.
-    external: ['solid-js'],
+    external: ['solid-js', 'node:async_hooks'],
 });

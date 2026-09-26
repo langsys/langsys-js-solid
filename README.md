@@ -248,6 +248,39 @@ Mounted `useT()` consumers repaint on the same tick. The snapshot is a cache: `i
 the catalog, which replaces it. An edited snapshot is refused with a `SnapshotError`; export it
 again rather than editing it.
 
+## Server rendering with SolidStart
+
+A server renders for many visitors at once, so each request renders in its own scope: its locale,
+its catalog and the phrases its page missed, kept apart from every other request. Add the middleware
+from `langsys-js-solid/start` (server-only) and tell it the locale your app already resolved:
+
+```ts
+// src/middleware.ts
+import { createMiddleware } from '@solidjs/start/middleware';
+import { langsysMiddleware } from 'langsys-js-solid/start';
+
+export default createMiddleware([langsysMiddleware({ locale: (event) => resolveLocale(event.request) })]);
+```
+
+`useT()`, `t()` and `LangsysApp.t` then serve that locale's translations in the page's HTML. Hand
+the catalog to the client so its first render matches: put `<LangsysSeed />` in the document's
+`<head>`, and seed before hydrating.
+
+```tsx
+// src/entry-server.tsx: inside the document's <head>
+<LangsysSeed />;
+
+// src/entry-client.tsx
+import { seedFromDocument } from 'langsys-js-solid';
+
+seedFromDocument();
+mount(() => <StartClient />, document.getElementById('app')!);
+```
+
+Phrases the page missed are sent after the response has been delivered, when the key may write and
+`ssrTokenStrategy` collects on the server.
+`<Phrase>` and `<Translate>` still render their children in the base language on the server.
+
 ## Playground
 
 `example/` is a runnable playground (`npm run dev`) mirroring the

@@ -1,5 +1,6 @@
 import { createComputed, createRoot, createSignal as createSolidSignal, getOwner, onCleanup, untrack } from 'solid-js';
 import type { Accessor } from 'solid-js';
+import { isServer } from 'solid-js/web';
 import { createSignal, type Signal, type WriteGrant } from 'langsys-js-typescript';
 
 /**
@@ -21,8 +22,18 @@ import { createSignal, type Signal, type WriteGrant } from 'langsys-js-typescrip
  * is disposed with it. Outside any owner (module level), the subscription
  * lives for the app's lifetime — fine for the SDK's global singletons, but
  * prefer calling from a component.
+ *
+ * On the server the accessor is a detached snapshot of the value at render
+ * time, and nothing subscribes. A server render renders once and Solid's
+ * `renderToString` never disposes the component tree, so a subscription opened
+ * there would never be released and would outlive the request on the core's
+ * process-wide signals.
  */
 export function useSignal<T>(signal: Signal<T>): Accessor<T> {
+    if (isServer) {
+        const atRender = signal.get();
+        return () => atRender;
+    }
     const [value, setValue] = createSolidSignal<T>(signal.get());
     const unsubscribe = signal.subscribe((next) => setValue(() => next));
     if (getOwner()) onCleanup(unsubscribe);

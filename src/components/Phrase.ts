@@ -2,7 +2,7 @@ import { children as resolveChildren, createEffect, onCleanup, onMount, untrack 
 import type { JSX } from 'solid-js';
 import { PHRASE_MARKER_ATTR, Phrase as VanillaPhrase, type ParamPrimitive } from 'langsys-js-typescript';
 import { isServer } from 'solid-js/web';
-import { appendResolved, serverHost } from './host.js';
+import { appendResolved, noticeUnrenderedBlock, serverHost } from './host.js';
 
 /**
  * Props for the Solid `Phrase` component. Mirrors the React/Vue/Svelte
@@ -43,6 +43,7 @@ export interface PhraseProps {
 export function Phrase(props: PhraseProps): JSX.Element {
     // No `document` under a server render: emit the untranslated, marked markup instead of throwing.
     if (isServer) {
+        noticeUnrenderedBlock();
         return serverHost(props.tag ?? 'span', { class: props.class, [PHRASE_MARKER_ATTR]: '' }, () => props.children);
     }
 

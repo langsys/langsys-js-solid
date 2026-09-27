@@ -2,7 +2,7 @@ import { children as resolveChildren, createEffect, onCleanup, onMount, untrack 
 import type { JSX } from 'solid-js';
 import { Translate as VanillaTranslate, type ParamPrimitive } from 'langsys-js-typescript';
 import { isServer } from 'solid-js/web';
-import { appendResolved, serverHost } from './host.js';
+import { appendResolved, noticeUnrenderedBlock, serverHost } from './host.js';
 
 /**
  * Props for the Solid `Translate` component. Mirrors the React/Vue/Svelte
@@ -48,7 +48,10 @@ export interface TranslateProps {
  */
 export function Translate(props: TranslateProps): JSX.Element {
     // No `document` under a server render: emit the untranslated markup instead of throwing.
-    if (isServer) return serverHost(props.tag ?? 'translate', { class: props.class }, () => props.children);
+    if (isServer) {
+        noticeUnrenderedBlock();
+        return serverHost(props.tag ?? 'translate', { class: props.class }, () => props.children);
+    }
 
     const host = document.createElement(props.tag ?? 'translate');
     if (props.class) host.className = props.class;

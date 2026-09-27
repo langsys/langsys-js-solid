@@ -1,6 +1,20 @@
 import { createComponent } from 'solid-js';
 import type { JSX, ResolvedChildren } from 'solid-js';
 import { Dynamic } from 'solid-js/web';
+import { warnUnrenderedBlock } from 'langsys-js-typescript';
+
+/**
+ * Why a server render serves a block as source text: Solid's server build hands a component its
+ * children as an HTML string, and the core's HTML-string entry is deferred, so no block can be
+ * handed to the core's renderer yet. The core says so once per process per reason, and the client
+ * translates the block after mount.
+ */
+export const STRING_PATH_DEFERRED = 'string-path-deferred';
+
+/** The notice for a block served untranslated on the server (the sanctioned fallback, SRV-1). */
+export function noticeUnrenderedBlock(): void {
+    warnUnrenderedBlock(STRING_PATH_DEFERRED);
+}
 
 /**
  * Append Solid-resolved children to a host element. Solid resolves children to

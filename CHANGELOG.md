@@ -4,6 +4,11 @@
 
 Initial release.
 
+- Built on `langsys-js-typescript` ^0.6.5, so a missing ICU argument (the
+  `<name>_gender` Langsys adds in gendered locales) renders the `other` branch
+  instead of raw ICU. `<Phrase params>` is typed `Record<string, ParamPrimitive>`,
+  like the React and Vue bindings.
+
 - `useT`, `useCurrentLocale`, `useTranslations`, `useLocaleStore`, and the
   low-level `useSignal` — seeded Solid accessors over the base SDK's signals.
 - `createLocaleStore` (SDK signal factory) and `solidToLocaleSource` (adapt an

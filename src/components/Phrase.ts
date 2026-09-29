@@ -1,6 +1,6 @@
 import { children as resolveChildren, createEffect, onCleanup, onMount, untrack } from 'solid-js';
 import type { JSX } from 'solid-js';
-import { PHRASE_MARKER_ATTR, Phrase as VanillaPhrase } from 'langsys-js-typescript';
+import { PHRASE_MARKER_ATTR, Phrase as VanillaPhrase, type ParamPrimitive } from 'langsys-js-typescript';
 import { appendResolved } from './host.js';
 
 /**
@@ -11,7 +11,7 @@ export interface PhraseProps {
     /** Category the phrase registers under (disambiguation for translators). */
     category?: string;
     /** Interpolation params — `{n}` for pluralization, `{name}`, etc. */
-    params?: Record<string, unknown>;
+    params?: Record<string, ParamPrimitive>;
     /** Host element tag. Defaults to `<span>`. */
     tag?: string;
     /** CSS class for the host element. */
